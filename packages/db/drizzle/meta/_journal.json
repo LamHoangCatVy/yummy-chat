@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781860317390,
+      "tag": "0000_sleepy_menace",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781860417000,
+      "tag": "0001_add_skill_owner",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781860500000,
+      "tag": "0002_add_memory_fields",
+      "breakpoints": true
+    }
+  ]
+}

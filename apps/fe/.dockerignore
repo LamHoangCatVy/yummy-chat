@@ -1,0 +1,16 @@
+node_modules
+.next
+dist
+.turbo
+*.tsbuildinfo
+.env*
+.git
+.gitignore
+tests
+playwright.config.ts
+*.md
+.DS_Store
+coverage
+.idea
+*.swp
+*.swo

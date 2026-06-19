@@ -1,0 +1,13 @@
+node_modules
+dist
+.turbo
+*.tsbuildinfo
+.env*
+.git
+.gitignore
+*.md
+.DS_Store
+coverage
+.idea
+*.swp
+*.swo

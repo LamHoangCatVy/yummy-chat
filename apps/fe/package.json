@@ -1,0 +1,36 @@
+{
+  "name": "@yummy/fe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "test": "bun test tests/api-contract.test.ts tests/no-db-import.test.ts",
+    "check-boundary": "bun test tests/no-db-import.test.ts",
+    "test:contracts": "bun test tests/api-contract.test.ts",
+    "smoke:core": "playwright test --config playwright.config.ts tests/e2e/core-smoke.spec.ts",
+    "smoke:advanced": "playwright test --config playwright.config.ts tests/e2e/advanced-smoke.spec.ts",
+    "test:a11y": "playwright test --config playwright.a11y.config.ts",
+    "test:visual": "playwright test --config playwright.visual.config.ts"
+  },
+  "dependencies": {
+    "@yummy/shared": "workspace:*",
+    "lucide-react": "^1.21.0",
+    "next": "^15.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.61.0",
+    "@tailwindcss/postcss": "^4.1.4",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.4"
+  }
+}

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Coverage
+coverage/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Vercel
+.vercel/

@@ -1,0 +1,34 @@
+{
+  "name": "yummy-chat",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "packageManager": "bun@1.2.4",
+  "engines": {
+    "bun": ">=1.2",
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:db": "docker compose up -d postgres",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "biome format --write .",
+    "check": "bun run lint && bun run typecheck",
+    "check-env": "bun run scripts/check-env.ts",
+    "db:migrate": "bun --filter @yummy/db db:migrate:test",
+    "db:seed": "bun --filter @yummy/db db:seed",
+    "db:reset": "bun run scripts/db-reset.ts",
+    "smoke:auth": "bun --filter @yummy/be smoke:auth",
+    "smoke:core": "bun --filter @yummy/fe smoke:core",
+    "smoke:local": "bun run scripts/smoke-local.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3"
+  }
+}
