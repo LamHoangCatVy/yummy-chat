@@ -4,14 +4,13 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files for the whole monorepo
-COPY package.json bun.lock ./
+COPY package.json package-lock.json ./
 COPY apps/fe/package.json ./apps/fe/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 
 # Install production + dev deps needed for build
-RUN corepack enable && corepack prepare bun@1.2.4 --activate
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # ── Stage 2: Build Next.js ──────────────────────────────────────────────────
 FROM deps AS builder
@@ -27,8 +26,7 @@ COPY apps/fe/ ./apps/fe/
 COPY packages/ ./packages/
 COPY tsconfig.base.json turbo.json biome.jsonc ./
 
-RUN corepack enable && corepack prepare bun@1.2.4 --activate
-RUN bun run --filter @yummy/fe build
+RUN npm run build -w @yummy/fe
 
 # ── Stage 3: Production runtime ─────────────────────────────────────────────
 FROM node:22-alpine AS runner

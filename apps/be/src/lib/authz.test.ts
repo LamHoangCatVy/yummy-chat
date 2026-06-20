@@ -1,12 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import * as schema from "@yummy/db/schema"
 import type { ConversationId, MemoryId, UserId } from "@yummy/shared"
-import { drizzle } from "drizzle-orm/postgres-js"
-import { migrate } from "drizzle-orm/postgres-js/migrator"
-import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { createTestDatabase } from "../test/db"
 
 // Set test env vars BEFORE any app imports
-process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-authz-tests-only"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
@@ -84,24 +81,11 @@ describe("authz policy functions", () => {
 
 // ── Repository scoping tests (real DB) ──────────────────────────────────────
 
-const testSql = postgres(process.env.DATABASE_URL)
+const testSql = testDatabase.sql
 
 describe("repository owner-scoping", () => {
   beforeAll(async () => {
-    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
-    try {
-      await adminSql`CREATE DATABASE yummy_chat_test`
-    } catch {
-      // already exists
-    }
-    await adminSql.end()
-
-    await testSql`DROP SCHEMA IF EXISTS public CASCADE`
-    await testSql`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await testSql`CREATE SCHEMA public`
-
-    const migrateDb = drizzle(testSql, { schema })
-    await migrate(migrateDb, { migrationsFolder: "../../packages/db/drizzle" })
+    await testDatabase.reset()
 
     // Seed two users
     await testSql`INSERT INTO "user" (id, name, email) VALUES (${userAId}, 'User A', 'a@test.com')`
@@ -119,7 +103,7 @@ describe("repository owner-scoping", () => {
   })
 
   afterAll(async () => {
-    await testSql.end()
+    await testDatabase.close()
   })
 
   const userAId = uid()

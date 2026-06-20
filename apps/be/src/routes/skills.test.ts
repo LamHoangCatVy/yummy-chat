@@ -1,17 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import * as schema from "@yummy/db/schema"
-import { drizzle } from "drizzle-orm/postgres-js"
-import { migrate } from "drizzle-orm/postgres-js/migrator"
-import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { createTestDatabase } from "../test/db"
 
-process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-skills-tests"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
 
 const { createApp } = await import("../app")
-
-const testSql = postgres(process.env.DATABASE_URL)
 
 function extractCookies(res: Response): string {
   return res.headers
@@ -49,20 +44,7 @@ function validPayload() {
 
 describe("skills API", () => {
   beforeAll(async () => {
-    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
-    try {
-      await adminSql`CREATE DATABASE yummy_chat_test`
-    } catch {
-      // already exists
-    }
-    await adminSql.end()
-
-    await testSql`DROP SCHEMA IF EXISTS public CASCADE`
-    await testSql`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await testSql`CREATE SCHEMA public`
-
-    const migrateDb = drizzle(testSql, { schema })
-    await migrate(migrateDb, { migrationsFolder: "../../packages/db/drizzle" })
+    await testDatabase.reset()
 
     const app = createApp()
     cookiesA = await signUpAndSignIn(app, userA)
@@ -70,7 +52,7 @@ describe("skills API", () => {
   })
 
   afterAll(async () => {
-    await testSql.end()
+    await testDatabase.close()
   })
 
   const userA = { name: "User A", email: "skill-a@test.com", password: "password123" }
@@ -106,8 +88,8 @@ describe("skills API", () => {
       expect(body.data.model).toBe("gpt-4")
       expect(body.data.temperature).toBe(0.7)
       expect(body.data.maxTokens).toBe(2048)
-      expect(body.data.id).toBeString()
-      expect(body.data.ownerId).toBeString()
+      expect(typeof body.data.id).toBe("string")
+      expect(typeof body.data.ownerId).toBe("string")
       skillId = body.data.id
     })
 
@@ -173,9 +155,9 @@ describe("skills API", () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.success).toBe(true)
-      expect(body.data).toBeArray()
-      expect(body.data.length).toBeGreaterThanOrEqual(2)
-      const names = body.data.map((s: { name: string }) => s.name)
+      expect(Array.isArray(body.data.skills)).toBe(true)
+      expect(body.data.skills.length).toBeGreaterThanOrEqual(2)
+      const names = body.data.skills.map((s: { name: string }) => s.name)
       expect(names).toContain("Test Skill")
       expect(names).toContain("Minimal Skill")
     })
@@ -187,8 +169,8 @@ describe("skills API", () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.data).toBeArray()
-      expect(body.data.length).toBe(0)
+      expect(Array.isArray(body.data.skills)).toBe(true)
+      expect(body.data.skills.length).toBe(0)
     })
   })
 

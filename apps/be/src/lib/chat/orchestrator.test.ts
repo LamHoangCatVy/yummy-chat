@@ -1,11 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import * as schema from "@yummy/db/schema"
 import type { ConversationId, MemoryId, MessageId, SkillId, UserId } from "@yummy/shared"
-import { drizzle } from "drizzle-orm/postgres-js"
-import { migrate } from "drizzle-orm/postgres-js/migrator"
-import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { createTestDatabase } from "../../test/db"
 
-process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-orchestrator-tests"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
@@ -19,7 +16,7 @@ const { FakeLLMProvider } = await import("../llm/fake-provider")
 const { createOrchestrator } = await import("./orchestrator")
 type StreamChunk = import("../llm/provider").StreamChunk
 
-const testSql = postgres(process.env.DATABASE_URL)
+const testSql = testDatabase.sql
 
 async function collectChunks(iterable: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = []
@@ -34,20 +31,7 @@ describe("chat orchestrator", () => {
   const actor = { userId: testUserId }
 
   beforeAll(async () => {
-    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
-    try {
-      await adminSql`CREATE DATABASE yummy_chat_test`
-    } catch {
-      // already exists
-    }
-    await adminSql.end()
-
-    await testSql`DROP SCHEMA IF EXISTS public CASCADE`
-    await testSql`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await testSql`CREATE SCHEMA public`
-
-    const migrateDb = drizzle(testSql, { schema })
-    await migrate(migrateDb, { migrationsFolder: "../../packages/db/drizzle" })
+    await testDatabase.reset()
 
     await testSql`
       INSERT INTO "user" (id, name, email, created_at, updated_at)
@@ -57,7 +41,7 @@ describe("chat orchestrator", () => {
   })
 
   afterAll(async () => {
-    await testSql.end()
+    await testDatabase.close()
   })
   describe("prompt assembly — no skill", () => {
     it("assembles basic system prompt without skill or memory", async () => {

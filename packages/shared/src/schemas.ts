@@ -2,8 +2,9 @@ import { z } from "zod"
 import type { ConversationId, MemoryId, MessageId, SessionId, SkillId, UserId } from "./brands"
 
 const uuidBrand = <T>(): z.ZodType<T> => z.string().uuid() as unknown as z.ZodType<T>
+const stringBrand = <T>(): z.ZodType<T> => z.string().min(1) as unknown as z.ZodType<T>
 
-export const userIdSchema = uuidBrand<UserId>()
+export const userIdSchema = stringBrand<UserId>()
 export const conversationIdSchema = uuidBrand<ConversationId>()
 export const messageIdSchema = uuidBrand<MessageId>()
 export const skillIdSchema = uuidBrand<SkillId>()
@@ -15,8 +16,8 @@ export const chatMessageSchema = z.object({
   conversationId: conversationIdSchema,
   role: z.enum(["system", "user", "assistant"]),
   content: z.string().min(1),
-  parentId: messageIdSchema.optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  parentId: messageIdSchema.nullish(),
+  metadata: z.record(z.string(), z.unknown()).nullish(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })
@@ -35,8 +36,8 @@ export const skillSchema = z.object({
   name: z.string().min(1).max(100),
   prompt: z.string().max(100_000),
   model: z.string().min(1).max(100),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().int().min(1).max(1_000_000).optional(),
+  temperature: z.number().min(0).max(2).nullish(),
+  maxTokens: z.number().int().min(1).max(1_000_000).nullish(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })
@@ -104,7 +105,7 @@ export const paginationInputSchema = z.object({
 
 export const conversationListResponseSchema = z.object({
   conversations: z.array(conversationSchema),
-  total: z.number().int().gte(0),
+  nextCursor: z.string().nullable().optional(),
 })
 
 export const skillListResponseSchema = z.object({

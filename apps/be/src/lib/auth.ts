@@ -1,7 +1,7 @@
 import { db } from "@yummy/db"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { env } from "./env"
+import { env } from "./env.js"
 
 export function createAuth(database = db) {
   return betterAuth({
@@ -16,7 +16,7 @@ export function createAuth(database = db) {
     },
     trustedOrigins: env.corsOrigins,
     advanced: {
-      generateId: "uuid",
+      generateId: () => crypto.randomUUID(),
       useSecureCookies: env.appEnv === "production",
       defaultCookieAttributes: {
         httpOnly: true,

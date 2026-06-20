@@ -7,7 +7,10 @@
  */
 
 import { readFileSync, existsSync } from "node:fs"
-import { join } from "node:path"
+import { join, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 interface EnvCheckResult {
   key: string
@@ -16,7 +19,7 @@ interface EnvCheckResult {
 }
 
 function main(): void {
-  const envExamplePath = join(import.meta.dir, "..", ".env.example")
+  const envExamplePath = join(__dirname, "..", ".env.example")
 
   if (!existsSync(envExamplePath)) {
     console.error("❌ .env.example not found at", envExamplePath)

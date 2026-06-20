@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 
 // Set test env vars BEFORE app module loads (env.ts lazy getters and @yummy/db read at import time)
 process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"

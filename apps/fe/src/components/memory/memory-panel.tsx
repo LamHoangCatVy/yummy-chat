@@ -204,7 +204,7 @@ function MemoryEntryCard({
               {entry.key}
             </span>
             {entry.category && (
-              <span className="shrink-0 rounded-radius-full bg-accent-ghost px-spacing-2 py-spacing-0.5 text-[0.6875rem] font-medium leading-[1.3] tracking-[0.05em] uppercase text-accent-secondary">
+              <span className="shrink-0 rounded-radius-full bg-accent-ghost px-spacing-2 py-spacing-half text-[0.6875rem] font-medium leading-[1.3] tracking-[0.05em] uppercase text-accent-secondary">
                 {entry.category}
               </span>
             )}

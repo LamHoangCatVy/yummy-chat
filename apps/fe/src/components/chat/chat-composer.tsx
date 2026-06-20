@@ -1,7 +1,7 @@
 "use client"
 
 import { SkillSelector } from "@/components/skills/skill-selector"
-import { SendHorizontal, Square } from "lucide-react"
+import { ArrowUp, Square } from "lucide-react"
 import { useCallback, useRef, useState } from "react"
 import type { StreamStatus } from "./types"
 
@@ -18,12 +18,12 @@ interface ChatComposerProps {
 /**
  * Multi-line text input anchored to the bottom of the chat surface.
  *
- * DESIGN.md composer spec:
- * - Auto-resizing textarea (up to 200px)
- * - Send button appears when text is present (accent-primary)
- * - Enter to send, Shift+Enter for newline
- * - Stop button replaces send during streaming
- * - Focus border transition (150ms, border-accent)
+ * ChatGPT-style composer:
+ * - Rounded pill container with a subtle border, two-row layout.
+ * - Textarea on top; skill selector (left) and send button (right) below.
+ * - Send is a circular black button with an up-arrow; disabled state is muted.
+ * - Stop button replaces send while streaming.
+ * - Enter to send, Shift+Enter for newline.
  */
 export function ChatComposer({
   status,
@@ -69,14 +69,9 @@ export function ChatComposer({
   }, [])
 
   return (
-    <div className="border-t border-border-subtle bg-surface-primary px-spacing-4 py-spacing-3">
-      <div className="mx-auto max-w-[768px]">
-        <div className="flex items-end gap-spacing-2 rounded-radius-md border border-border-subtle bg-surface-primary px-spacing-3 py-spacing-2 transition-colors duration-[150ms] focus-within:border-border-accent">
-          <SkillSelector
-            conversationId={conversationId}
-            selectedSkillId={selectedSkillId}
-            onSelect={onSkillSelect}
-          />
+    <div className="bg-surface-primary px-spacing-4 pb-spacing-4 pt-spacing-2">
+      <div className="mx-auto max-w-[48rem]">
+        <div className="flex flex-col rounded-[28px] border border-border-subtle bg-surface-primary px-spacing-4 py-spacing-3 transition-colors duration-[150ms] focus-within:border-border-hover">
           <textarea
             ref={textareaRef}
             value={value}
@@ -85,35 +80,42 @@ export function ChatComposer({
               handleInput()
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Send a message..."
+            placeholder="Message yummy-chat"
             disabled={disabled || isStreaming}
             rows={1}
-            className="flex-1 resize-none bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary placeholder:text-text-tertiary focus:outline-none disabled:opacity-40"
+            className="max-h-[200px] flex-1 resize-none bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary placeholder:text-text-tertiary focus:outline-none disabled:opacity-40"
             aria-label="Message input"
           />
-          {isStreaming ? (
-            <button
-              type="button"
-              onClick={onStop}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-radius-sm bg-status-error text-text-inverse transition-[transform] duration-[100ms] ease-in-out hover:opacity-90 active:scale-[0.98]"
-              aria-label="Stop generating"
-            >
-              <Square size={14} fill="currentColor" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSend}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-radius-sm bg-accent-primary text-text-inverse transition-[transform,opacity] duration-[100ms] ease-in-out hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
-              aria-label="Send message"
-            >
-              <SendHorizontal size={16} />
-            </button>
-          )}
+          <div className="mt-spacing-2 flex items-center justify-between">
+            <SkillSelector
+              conversationId={conversationId}
+              selectedSkillId={selectedSkillId}
+              onSelect={onSkillSelect}
+            />
+            {isStreaming ? (
+              <button
+                type="button"
+                onClick={onStop}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary text-text-inverse transition-[opacity,transform] duration-[100ms] ease-in-out hover:opacity-90 active:scale-[0.96]"
+                aria-label="Stop generating"
+              >
+                <Square size={14} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSend}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary text-text-inverse transition-[opacity,transform,background-color] duration-[100ms] ease-in-out hover:opacity-90 active:scale-[0.96] disabled:bg-surface-tertiary disabled:text-text-tertiary disabled:pointer-events-none"
+                aria-label="Send message"
+              >
+                <ArrowUp size={16} />
+              </button>
+            )}
+          </div>
         </div>
-        <p className="mt-spacing-1 text-center text-[0.75rem] leading-[1.4] text-text-tertiary">
-          Enter to send, Shift+Enter for new line
+        <p className="mt-spacing-2 text-center text-[0.75rem] leading-[1.4] text-text-tertiary">
+          yummy-chat can make mistakes. Check important info.
         </p>
       </div>
     </div>

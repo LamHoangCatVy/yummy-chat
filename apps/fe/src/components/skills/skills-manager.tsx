@@ -212,7 +212,7 @@ function SkillForm({ initial, onSubmit, onCancel }: SkillFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-spacing-3 rounded-radius-md border border-border-accent bg-surface-secondary px-spacing-4 py-spacing-4"
+      className="mt-spacing-3 rounded-radius-md border border-border-default bg-surface-secondary px-spacing-4 py-spacing-4"
     >
       <div className="flex flex-col gap-spacing-3">
         <div>

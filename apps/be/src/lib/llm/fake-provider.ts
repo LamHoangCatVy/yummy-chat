@@ -6,7 +6,7 @@
  * error-handling paths can be exercised without a real API key.
  */
 
-import type { LLMProvider, StreamChunk, StreamRequest, UsageMetadata } from "./provider"
+import type { LLMProvider, StreamChunk, StreamRequest, UsageMetadata } from "./provider.js"
 
 // ── Configuration ───────────────────────────────────────────────────────────
 

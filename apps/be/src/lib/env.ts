@@ -24,6 +24,12 @@ export const env = {
   get llmProviderApiKey(): string | undefined {
     return process.env.LLM_PROVIDER_API_KEY
   },
+  get openaiApiKey(): string | undefined {
+    return process.env.OPENAI_API_KEY
+  },
+  get openaiModel(): string {
+    return optionalEnv("OPENAI_MODEL", "gpt-5-nano")
+  },
   get appEnv(): string {
     return optionalEnv("APP_ENV", "development")
   },

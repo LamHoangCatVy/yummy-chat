@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory"
-import { redact } from "../lib/redact"
-import type { RequestIdVariables } from "./request-id"
-import type { SessionVariables } from "./session"
+import { redact } from "../lib/redact.js"
+import type { RequestIdVariables } from "./request-id.js"
+import type { SessionVariables } from "./session.js"
 
 type LogVariables = RequestIdVariables & SessionVariables
 

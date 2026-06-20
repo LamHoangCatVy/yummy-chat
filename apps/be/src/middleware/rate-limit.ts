@@ -1,6 +1,6 @@
 import type { ApiErrorResponse } from "@yummy/shared"
 import { createMiddleware } from "hono/factory"
-import { emitAuditEvent } from "../lib/audit"
+import { emitAuditEvent } from "../lib/audit.js"
 
 export interface RateLimitConfig {
   readonly windowMs: number

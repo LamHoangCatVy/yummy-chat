@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test } from "vitest"
 import { AUDIT_EVENT_TYPES, clearAuditBuffer, emitAuditEvent, getAuditBuffer } from "./audit"
 
 describe("audit", () => {

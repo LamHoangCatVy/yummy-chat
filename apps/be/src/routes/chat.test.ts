@@ -1,17 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import * as schema from "@yummy/db/schema"
-import { drizzle } from "drizzle-orm/postgres-js"
-import { migrate } from "drizzle-orm/postgres-js/migrator"
-import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { createTestDatabase } from "../test/db"
 
-process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-chat-stream-tests"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
 
 const { createApp } = await import("../app")
-
-const testSql = postgres(process.env.DATABASE_URL)
 
 function extractCookies(res: Response): string {
   return res.headers
@@ -99,20 +94,7 @@ describe("chat streaming API", () => {
   let conversationId: string
 
   beforeAll(async () => {
-    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
-    try {
-      await adminSql`CREATE DATABASE yummy_chat_test`
-    } catch {
-      // already exists
-    }
-    await adminSql.end()
-
-    await testSql`DROP SCHEMA IF EXISTS public CASCADE`
-    await testSql`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await testSql`CREATE SCHEMA public`
-
-    const migrateDb = drizzle(testSql, { schema })
-    await migrate(migrateDb, { migrationsFolder: "../../packages/db/drizzle" })
+    await testDatabase.reset()
 
     const app = createApp()
     cookies = await signUpAndSignIn(app, testUser)
@@ -128,7 +110,7 @@ describe("chat streaming API", () => {
   })
 
   afterAll(async () => {
-    await testSql.end()
+    await testDatabase.close()
   })
 
   describe("POST /api/v1/chat/stream", () => {
@@ -202,12 +184,12 @@ describe("chat streaming API", () => {
       expect(finishData.finishReason).toBe("stop")
       expect(finishData.usage).toBeDefined()
       expect(finishData.usage.outputTokens).toBeGreaterThan(0)
-      expect(finishData.messageId).toBeString()
+      expect(typeof finishData.messageId).toBe("string")
 
       // Each text event should have parseable data
       for (const evt of textEvents) {
         const data = JSON.parse(evt.data)
-        expect(data.text).toBeString()
+        expect(typeof data.text).toBe("string")
         expect(data.text.length).toBeGreaterThan(0)
       }
     })

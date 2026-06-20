@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory"
-import type { Auth } from "../lib/auth"
+import type { Auth } from "../lib/auth.js"
 
 type SessionResponse = Awaited<ReturnType<Auth["api"]["getSession"]>>
 type SessionData = NonNullable<SessionResponse>

@@ -10,15 +10,15 @@ import { eq } from "@yummy/db"
 import { db } from "@yummy/db"
 import { memoryEntry, usageRecord, userMemorySettings } from "@yummy/db/schema"
 import type { ConversationId, MessageId, SkillId, UserId } from "@yummy/shared"
-import type { Actor } from "../authz"
+import type { Actor } from "../authz.js"
 import type {
   LLMProvider,
   ProviderMessage,
   StreamChunk,
   StreamRequest,
   UsageMetadata,
-} from "../llm/provider"
-import { type MessageRow, messageRepository, skillRepository } from "../repositories"
+} from "../llm/provider.js"
+import { type MessageRow, messageRepository, skillRepository } from "../repositories.js"
 
 // ── Constants ───────────────────────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 import { API_V1 } from "@yummy/shared"
 import { Hono } from "hono"
-import { auditFromContext, emitAuditEvent } from "../lib/audit"
-import type { Auth } from "../lib/auth"
-import type { RequestIdVariables } from "../middleware/request-id"
-import type { SessionVariables } from "../middleware/session"
+import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
+import type { Auth } from "../lib/auth.js"
+import type { RequestIdVariables } from "../middleware/request-id.js"
+import type { SessionVariables } from "../middleware/session.js"
 
 type AuthRouteVariables = RequestIdVariables & SessionVariables
 

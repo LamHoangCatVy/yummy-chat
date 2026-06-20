@@ -5,4 +5,5 @@ export const API_V1 = {
   SKILLS: "/api/v1/skills",
   MEMORY: "/api/v1/memory",
   HEALTH: "/api/v1/health",
+  FILES: "/api/v1/files",
 } as const

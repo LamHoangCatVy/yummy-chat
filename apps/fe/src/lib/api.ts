@@ -79,7 +79,21 @@ async function fetchApi<T extends z.ZodType>(
   const json: unknown = await response.json()
 
   if (schema) {
-    return schema.parse((json as ApiResponse<unknown>).data ?? json)
+    const data = (json as ApiResponse<unknown>).data ?? json
+    const parsed = schema.safeParse(data)
+    if (!parsed.success) {
+      console.error(`[fetchApi] response schema mismatch for ${path}:`, parsed.error.issues)
+      throw new ApiError(500, {
+        success: false,
+        error: {
+          type: "INTERNAL_ERROR",
+          message: "Received an unexpected response from the server.",
+          statusCode: 500,
+        },
+        meta: { timestamp: new Date().toISOString(), requestId: "client" },
+      })
+    }
+    return parsed.data
   }
 
   return json as z.infer<T>

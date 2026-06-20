@@ -4,12 +4,13 @@
  * Verifies environment, DB connectivity, and runs the existing smoke
  * scripts for both BE (auth) and FE (core E2E).
  *
- * Usage:  bun run scripts/smoke-local.ts
+ * Usage:  npm run smoke:local
  * Prereqs: .env loaded, Postgres running, dev servers running
- *          (bun run dev should be started in another terminal)
+ *          (npm run dev should be started in another terminal)
  */
 
 import { existsSync, readFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
 
 interface Check {
   name: string
@@ -77,7 +78,7 @@ async function main(): Promise<void> {
     log({
       name: `BE health (port ${bePort})`,
       ok: false,
-      detail: "unreachable — is `bun run dev` running?",
+      detail: "unreachable — is `npm run dev` running?",
     })
   }
 
@@ -95,19 +96,19 @@ async function main(): Promise<void> {
     log({
       name: `FE reachable (port ${fePort})`,
       ok: false,
-      detail: "unreachable — is `bun run dev` running?",
+      detail: "unreachable — is `npm run dev` running?",
     })
   }
 
   // ── 5. Run existing smoke scripts ─────────────────────────────────────
   console.log("\n  ▶️  Running BE auth smoke…")
-  const authSmoke = Bun.spawnSync(["bun", "--filter", "@yummy/be", "smoke:auth"], {
-    stdio: ["inherit", "inherit", "inherit"],
+  const authSmoke = spawnSync("npm", ["run", "smoke:auth", "-w", "@yummy/be"], {
+    stdio: "inherit",
   })
   log({
     name: "BE auth smoke",
-    ok: authSmoke.exitCode === 0,
-    detail: authSmoke.exitCode === 0 ? "passed" : `exit code ${authSmoke.exitCode}`,
+    ok: authSmoke.status === 0,
+    detail: authSmoke.status === 0 ? "passed" : `exit code ${authSmoke.status}`,
   })
 
   // ── 6. Summary ───────────────────────────────────────────────────────

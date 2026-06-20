@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { redact } from "./redact"
+import { redact } from "./redact.js"
 
 // ── Event types ─────────────────────────────────────────────────────────────
 

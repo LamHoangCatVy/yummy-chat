@@ -2,11 +2,12 @@
  * DB reset script — drops all schemas, recreates public, runs migrations,
  * then seeds development data.
  *
- * Usage:  bun run scripts/db-reset.ts
+ * Usage:  npm run db:reset
  * Requires: .env with DATABASE_URL pointing to a local Postgres
  * Safety:  guarded by APP_ENV check (only runs in development / test)
  */
 
+import { spawnSync } from "node:child_process"
 import postgres from "postgres"
 
 const ALLOWED_ENVS = new Set(["test", "development"])
@@ -47,23 +48,23 @@ async function main(): Promise<void> {
 
   // Run migrations via the @yummy/db package script
   console.log("  ▶️  Running migrations…")
-  const migrateProc = Bun.spawnSync(["bun", "--filter", "@yummy/db", "db:migrate:test"], {
-    stdio: ["inherit", "inherit", "inherit"],
+  const migrateProc = spawnSync("npm", ["run", "db:migrate:test", "-w", "@yummy/db"], {
+    stdio: "inherit",
   })
-  if (migrateProc.exitCode !== 0) {
+  if (migrateProc.status !== 0) {
     console.error("  ❌ Migration failed")
-    process.exit(migrateProc.exitCode)
+    process.exit(migrateProc.status ?? 1)
   }
   console.log("  ✅ Migrations applied")
 
   // Seed data
   console.log("  ▶️  Seeding data…")
-  const seedProc = Bun.spawnSync(["bun", "--filter", "@yummy/db", "db:seed"], {
-    stdio: ["inherit", "inherit", "inherit"],
+  const seedProc = spawnSync("npm", ["run", "db:seed", "-w", "@yummy/db"], {
+    stdio: "inherit",
   })
-  if (seedProc.exitCode !== 0) {
+  if (seedProc.status !== 0) {
     console.error("  ❌ Seed failed")
-    process.exit(seedProc.exitCode)
+    process.exit(seedProc.status ?? 1)
   }
   console.log("  ✅ Seed data inserted")
 

@@ -1,16 +1,17 @@
 import { API_V1 } from "@yummy/shared"
 import { Hono } from "hono"
-import type { Auth } from "../lib/auth"
-import type { RequestIdVariables } from "../middleware/request-id"
-import type { SessionVariables } from "../middleware/session"
-import { createAuthRouter } from "./auth"
-import { chatRouter } from "./chat"
-import { conversationSkillRouter } from "./conversation-skill"
-import { conversationsRouter } from "./conversations"
-import { healthRouter } from "./health"
-import { memoryRouter } from "./memory"
-import { messagesRouter } from "./messages"
-import { skillsRouter } from "./skills"
+import type { Auth } from "../lib/auth.js"
+import type { RequestIdVariables } from "../middleware/request-id.js"
+import type { SessionVariables } from "../middleware/session.js"
+import { createAuthRouter } from "./auth.js"
+import { chatRouter } from "./chat.js"
+import { conversationSkillRouter } from "./conversation-skill.js"
+import { conversationsRouter } from "./conversations.js"
+import { filesRouter } from "./files.js"
+import { healthRouter } from "./health.js"
+import { memoryRouter } from "./memory.js"
+import { messagesRouter } from "./messages.js"
+import { skillsRouter } from "./skills.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
 
@@ -25,6 +26,7 @@ export function createApiRouter(auth: Auth) {
   router.route(API_V1.SKILLS, skillsRouter)
   router.route(API_V1.CHAT, chatRouter)
   router.route(API_V1.MEMORY, memoryRouter)
+  router.route(API_V1.FILES, filesRouter)
 
   return router
 }

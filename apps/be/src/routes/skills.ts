@@ -8,12 +8,12 @@ import {
 } from "@yummy/shared"
 import { Hono } from "hono"
 import { z } from "zod"
-import { auditFromContext, emitAuditEvent } from "../lib/audit"
-import type { Actor } from "../lib/authz"
-import { skillRepository } from "../lib/repositories"
-import { requireAuth } from "../middleware/auth-guard"
-import type { RequestIdVariables } from "../middleware/request-id"
-import type { SessionVariables } from "../middleware/session"
+import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
+import type { Actor } from "../lib/authz.js"
+import { skillRepository } from "../lib/repositories.js"
+import { requireAuth } from "../middleware/auth-guard.js"
+import type { RequestIdVariables } from "../middleware/request-id.js"
+import type { SessionVariables } from "../middleware/session.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
 
@@ -108,9 +108,9 @@ skillsRouter.get("/", async (c) => {
   const repo = skillRepository(actor)
   const rows = await repo.list()
 
-  const res: ApiResponse<typeof rows> = {
+  const res: ApiResponse<{ skills: typeof rows }> = {
     success: true,
-    data: rows,
+    data: { skills: rows },
     meta: meta(c),
   }
   return c.json(res, 200)

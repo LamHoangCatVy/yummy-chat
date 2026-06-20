@@ -1,17 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import * as schema from "@yummy/db/schema"
-import { drizzle } from "drizzle-orm/postgres-js"
-import { migrate } from "drizzle-orm/postgres-js/migrator"
-import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { createTestDatabase } from "../test/db"
 
-process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-conversation-tests-only"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
 
 const { createApp } = await import("../app")
-
-const testSql = postgres(process.env.DATABASE_URL)
 
 function extractCookies(res: Response): string {
   return res.headers
@@ -39,20 +34,7 @@ async function signUpAndSignIn(
 
 describe("conversations API", () => {
   beforeAll(async () => {
-    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
-    try {
-      await adminSql`CREATE DATABASE yummy_chat_test`
-    } catch {
-      // already exists
-    }
-    await adminSql.end()
-
-    await testSql`DROP SCHEMA IF EXISTS public CASCADE`
-    await testSql`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await testSql`CREATE SCHEMA public`
-
-    const migrateDb = drizzle(testSql, { schema })
-    await migrate(migrateDb, { migrationsFolder: "../../packages/db/drizzle" })
+    await testDatabase.reset()
 
     const app = createApp()
     cookiesA = await signUpAndSignIn(app, userA)
@@ -60,7 +42,7 @@ describe("conversations API", () => {
   })
 
   afterAll(async () => {
-    await testSql.end()
+    await testDatabase.close()
   })
 
   const userA = { name: "User A", email: "conv-a@test.com", password: "password123" }
@@ -92,7 +74,7 @@ describe("conversations API", () => {
       const body = await res.json()
       expect(body.success).toBe(true)
       expect(body.data.title).toBe("My Chat")
-      expect(body.data.id).toBeString()
+      expect(typeof body.data.id).toBe("string")
       conversationId = body.data.id
     })
 
@@ -138,8 +120,8 @@ describe("conversations API", () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.success).toBe(true)
-      expect(body.data.data).toBeArray()
-      expect(body.data.data.length).toBeGreaterThanOrEqual(1)
+      expect(Array.isArray(body.data.conversations)).toBe(true)
+      expect(body.data.conversations.length).toBeGreaterThanOrEqual(1)
       expect(body.data.nextCursor === null || typeof body.data.nextCursor === "string").toBe(true)
     })
 
@@ -150,7 +132,7 @@ describe("conversations API", () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.data.data.length).toBeLessThanOrEqual(1)
+      expect(body.data.conversations.length).toBeLessThanOrEqual(1)
     })
 
     it("rejects invalid limit", async () => {
@@ -297,8 +279,8 @@ describe("conversations API", () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json()
-      const titles = body.data.data.map((c: { title: string }) => c.title)
-      expect(titles).not.toInclude("Updated Title")
+      const titles = body.data.conversations.map((c: { title: string }) => c.title)
+      expect(titles).not.toContain("Updated Title")
     })
   })
 
@@ -371,7 +353,7 @@ describe("conversations API", () => {
         expect(res.status).toBe(200)
         const body = await res.json()
         expect(body.success).toBe(true)
-        expect(body.data.data).toBeArray()
+        expect(Array.isArray(body.data.data)).toBe(true)
         expect(body.data.data.length).toBeGreaterThanOrEqual(1)
       })
 

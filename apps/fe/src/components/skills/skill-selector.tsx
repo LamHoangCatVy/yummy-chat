@@ -104,8 +104,8 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
         onClick={() => setIsOpen((prev) => !prev)}
         className={`flex items-center gap-spacing-1 rounded-radius-sm px-spacing-2 py-spacing-1 text-[0.8125rem] leading-[1.5] transition-colors duration-[150ms] ${
           selectedSkill
-            ? "bg-accent-ghost text-accent-primary"
-            : "text-text-tertiary hover:bg-surface-tertiary hover:text-text-secondary"
+            ? "bg-surface-tertiary text-text-primary"
+            : "text-text-tertiary hover:bg-surface-tertiary hover:text-text-primary"
         }`}
         aria-label={selectedSkill ? `Skill: ${selectedSkill.name}` : "Select skill"}
         aria-expanded={isOpen}
@@ -123,7 +123,7 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
 
       {isOpen && (
         <div
-          className="absolute bottom-full left-0 z-50 mb-spacing-2 w-[240px] rounded-radius-md border border-border-subtle bg-surface-primary py-spacing-1 shadow-lg"
+          className="absolute bottom-full left-0 z-50 mb-spacing-2 w-[240px] rounded-radius-md border border-border-subtle bg-surface-primary py-spacing-1"
           aria-label="Available skills"
         >
           {selectedSkill && (
@@ -144,7 +144,7 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
               onClick={() => void handleSelect(skill.id)}
               className={`flex w-full items-center gap-spacing-2 px-spacing-3 py-spacing-2 text-left text-[0.8125rem] leading-[1.5] transition-colors duration-[150ms] hover:bg-surface-tertiary ${
                 skill.id === selectedSkillId
-                  ? "bg-accent-ghost text-accent-primary"
+                  ? "bg-surface-tertiary text-text-primary"
                   : "text-text-primary"
               }`}
               aria-selected={skill.id === selectedSkillId}

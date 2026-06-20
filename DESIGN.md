@@ -21,7 +21,7 @@ yummy-chat is a neutral, focused command center for conversing with AI. Its atmo
 
 The identity is technical but warm. Think cockpit instrumentation meets a calm workspace. Nothing decorative exists without a purpose. Every element earns its place through utility.
 
-The app does not borrow from OpenAI, ChatGPT, or any branded AI assistant. There are no green accents, no OpenAI logos, no ChatGPT color references. The visual language is original to yummy-chat: a clean, neutral palette with a single subtle accent for interactive elements.
+The visual language is intentionally monochrome, inspired by the calm, low-color aesthetic of modern conversational AI surfaces (e.g. chatgpt.com). A single near-black serves as the only "accent" — used for primary actions, focus rings, and the send control. There are no blue, green, or purple brand accents. Status colors (red for errors, amber for warnings, green for success) are retained but muted, and used only where they convey functional meaning — never decoratively.
 
 Key atmosphere principles:
 
@@ -42,47 +42,51 @@ Tokens follow a `role-variant` pattern (e.g., `surface-primary`, `text-secondary
 
 | Token | Light Value | Dark Value | Usage |
 |-------|-------------|------------|-------|
-| `surface-primary` | `#FFFFFF` | `#0F0F10` | Main app background (chat area, content) |
-| `surface-secondary` | `#F5F5F5` | `#1A1A1C` | Sidebar, panels, secondary surfaces |
-| `surface-tertiary` | `#EDEDED` | `#252527` | Hover states, elevated cards, dropdowns |
-| `surface-inverse` | `#0F0F10` | `#FFFFFF` | Accent on dark surfaces, inverted text bg |
-| `surface-overlay` | `rgba(0,0,0,0.04)` | `rgba(255,255,255,0.04)` | Scrim, modal backdrops, subtle overlay |
+| `surface-primary` | `#FFFFFF` | `#212121` | Main app background (chat area, content) |
+| `surface-secondary` | `#F9F9F9` | `#171717` | Sidebar, panels, secondary surfaces |
+| `surface-tertiary` | `#ECECEC` | `#2F2F2F` | Hover states, elevated cards, dropdowns, avatars |
+| `surface-inverse` | `#0D0D0D` | `#FFFFFF` | Accent on dark surfaces, inverted text bg |
+| `surface-overlay` | `rgba(0,0,0,0.4)` | `rgba(0,0,0,0.6)` | Scrim, modal backdrops, drawer overlay |
 
 ### Text Tokens
 
 | Token | Light Value | Dark Value | Usage |
 |-------|-------------|------------|-------|
-| `text-primary` | `#171717` | `#EDEDED` | Body text, headings, primary content |
-| `text-secondary` | `#525252` | `#A3A3A3` | Subtle labels, descriptions, metadata |
-| `text-tertiary` | `#8C8C8C` | `#6B6B6B` | Placeholder text, disabled states |
-| `text-inverse` | `#FFFFFF` | `#0F0F10` | Text on inverse surfaces |
-| `text-link` | `#3B82F6` | `#60A5FA` | Links, inline navigation |
+| `text-primary` | `#0D0D0D` | `#ECECEC` | Body text, headings, primary content |
+| `text-secondary` | `#5D5D5F` | `#B4B4B4` | Subtle labels, descriptions, metadata |
+| `text-tertiary` | `#8E8E90` | `#8E8E8E` | Placeholder text, disabled states |
+| `text-inverse` | `#FFFFFF` | `#0D0D0D` | Text on inverse surfaces (buttons, send) |
+| `text-link` | `#0D0D0D` | `#ECECEC` | Links, inline navigation (underlined) |
 
 ### Border Tokens
 
 | Token | Light Value | Dark Value | Usage |
 |-------|-------------|------------|-------|
-| `border-subtle` | `#E5E5E5` | `#2A2A2C` | Default borders, dividers, input edges |
-| `border-default` | `#D4D4D4` | `#3A3A3C` | Stronger borders, active states |
-| `border-hover` | `#A3A3A3` | `#525252` | Hovered interactive borders |
-| `border-accent` | `#3B82F6` | `#60A5FA` | Focus rings, selected states |
+| `border-subtle` | `#E9E9E9` | `#2F2F2F` | Default borders, dividers, input edges |
+| `border-default` | `#D9D9D9` | `#3A3A3A` | Stronger borders, active states |
+| `border-hover` | `#B4B4B4` | `#525252` | Hovered interactive borders, composer focus |
+| `border-accent` | `#0D0D0D` | `#ECECEC` | Focus rings, selected states |
 
 ### Accent Tokens
 
+Monochrome — black is the only accent. No blue, no purple.
+
 | Token | Light Value | Dark Value | Usage |
 |-------|-------------|------------|-------|
-| `accent-primary` | `#3B82F6` | `#60A5FA` | Primary buttons, active indicators, focus rings |
-| `accent-secondary` | `#6366F1` | `#818CF8` | Alternative accent (skill tags, secondary CTAs) |
-| `accent-ghost` | `rgba(59,130,246,0.08)` | `rgba(96,165,250,0.10)` | Ghost/hover backgrounds for accent elements |
+| `accent-primary` | `#0D0D0D` | `#ECECEC` | Primary buttons, send control, active toggle |
+| `accent-secondary` | `#2A2A2A` | `#A3A3A3` | Secondary icon tint, neutral emphasis |
+| `accent-ghost` | `rgba(0,0,0,0.05)` | `rgba(255,255,255,0.10)` | Ghost/hover backgrounds, selection tint |
 
 ### Status Tokens
 
+Kept functional and muted — never used decoratively.
+
 | Token | Light Value | Dark Value | Usage |
 |-------|-------------|------------|-------|
-| `status-success` | `#22C55E` | `#4ADE80` | Success, connected, online |
-| `status-warning` | `#F59E0B` | `#FBBF24` | Warning, rate limit approaching |
-| `status-error` | `#EF4444` | `#F87171` | Error, failure, disconnect |
-| `status-info` | `#3B82F6` | `#60A5FA` | Info, neutral notification |
+| `status-success` | `#16A34A` | `#4ADE80` | Success, connected, online |
+| `status-warning` | `#D97706` | `#FBBF24` | Warning, rate limit approaching |
+| `status-error` | `#D6453D` | `#F87171` | Error, failure, destructive actions |
+| `status-info` | `#0D0D0D` | `#ECECEC` | Info, neutral notification |
 
 ---
 
@@ -177,31 +181,37 @@ Maximum content width for the chat surface is `768px` (centered), keeping line l
 
 Components documented here represent planned patterns for the application. Each entry describes the visual contract, not the implementation. Components are built as needed; this list does not imply they all exist today.
 
-### Chat Bubble (`chat-bubble`)
+### Message Row (`message-row`)
 
-The fundamental message unit. Rendered as a distinct surface block with:
-- Tonal-shift background distinguishing user (accent-ghost) from assistant (surface-secondary)
-- Text styled at `text-body` with relaxed line height
-- Optional attached metadata (timestamp, token count, model label in `text-caption`)
-- Streaming state indicated by a subtle animated cursor (motion only, no spinner overlay)
+The fundamental message unit, rendered as a full-width row (no bubbles) — mirroring the calm, low-chrome aesthetic of chatgpt.com. Each row contains:
+
+- A small circular avatar (28px, `surface-tertiary`) to the left, with a Lucide icon (`User` for user, `Sparkles` for assistant)
+- A name label above the text (`text-[0.8125rem]` semibold, `text-primary`)
+- The message body styled at `text-body` with relaxed line height (`1.7`), full width within the centered 48rem container
+- No background fill on either user or assistant messages — whitespace alone separates messages
+- Vertical rhythm: `spacing-8` between rows, `spacing-1` between name and text
+- Streaming state indicated by a subtle animated cursor appended to the text (motion only, no spinner overlay)
 - Code blocks within rendered with monospace background and horizontal scroll
 
 ### Sidebar (`sidebar`)
 
 Persistent left navigation providing:
-- New chat composer button (prominent, top)
-- Conversation history list (truncated titles, timestamps)
-- Search/filter bar for history
-- Collapses to icon-only or overlay drawer at `bp-md`
+- New chat button rendered as a subtle bordered pill (`radius-full`) with a pen icon — no filled accent
+- Conversation history list of single-line truncated titles (no timestamps in the row), neutral hover/active via `surface-tertiary`
+- User footer at the bottom: name on the left, icon buttons for settings and sign-out on the right
+- Collapses to overlay drawer at `bp-md`
 
 ### Composer (`composer`)
 
-Multi-line text input anchored to the bottom of the chat surface:
+Multi-line text input anchored to the bottom of the chat surface, styled as a rounded pill (`radius-[28px]`):
+- Two-row layout: textarea on top, controls row below
 - Auto-resizing textarea (up to 200px)
-- Send button appears when text is present (accent-primary)
-- Attachment and skill-toggle icon buttons flank the input (Lucide icons)
-- Micro-animation on focus (border-accent transition, 150ms)
-- Drag-and-drop target zone indicator for file attachments
+- Skill selector anchored to the bottom-left of the controls row
+- Send control is a circular black button (`accent-primary`, 32px, `radius-full`) with an up-arrow icon, anchored bottom-right
+- Disabled send renders muted (`surface-tertiary` + `text-tertiary`); Stop replaces Send during streaming (square icon)
+- Enter to send, Shift+Enter for newline
+- Subtle border (`border-subtle`) that strengthens on focus (`border-hover`, 150ms)
+- Micro-disclaimer line beneath the composer in `text-tertiary`
 
 ### Skill Selector (`skill-selector`)
 
@@ -209,7 +219,7 @@ Inline or popover control for selecting an AI skill/persona:
 - Trigger rendered as a chip or avatar with current skill name in `text-small`
 - Dropdown or popover lists available skills with brief description
 - Each skill displayed with a Lucide icon (no emojis)
-- Selected state uses accent-primary background
+- Selected state uses a neutral `surface-tertiary` background (no color accent)
 
 ### Memory Panel (`memory-panel`)
 

@@ -9,12 +9,12 @@ import {
   updateMemoryInputSchema,
 } from "@yummy/shared"
 import { Hono } from "hono"
-import { auditFromContext, emitAuditEvent } from "../lib/audit"
-import type { Actor } from "../lib/authz"
-import { memoryRepository } from "../lib/repositories"
-import { requireAuth } from "../middleware/auth-guard"
-import type { RequestIdVariables } from "../middleware/request-id"
-import type { SessionVariables } from "../middleware/session"
+import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
+import type { Actor } from "../lib/authz.js"
+import { memoryRepository } from "../lib/repositories.js"
+import { requireAuth } from "../middleware/auth-guard.js"
+import type { RequestIdVariables } from "../middleware/request-id.js"
+import type { SessionVariables } from "../middleware/session.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
 

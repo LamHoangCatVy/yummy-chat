@@ -1,14 +1,14 @@
 # yummy-chat
 
-A ChatGPT-like chat application monorepo powered by Bun, Turbo, Next.js, Hono, and Drizzle/Postgres.
+A ChatGPT-like chat application monorepo powered by npm, Turbo, Next.js, Hono, and Drizzle/Postgres.
 
 ## Stack
 
 | Layer        | Technology                              |
 | ------------ | --------------------------------------- |
-| Monorepo     | [Bun](https://bun.sh) + [Turbo](https://turbo.build) |
+| Monorepo     | [npm](https://docs.npmjs.com) + [Turbo](https://turbo.build) |
 | Frontend     | [Next.js](https://nextjs.org) (App Router) |
-| Backend      | [Hono](https://hono.dev) on Bun        |
+| Backend      | [Hono](https://hono.dev) on Node.js (tsx) |
 | Database     | [Postgres](https://postgresql.org) + [Drizzle](https://orm.drizzle.team) |
 | Auth         | [Better Auth](https://better-auth.com) |
 | LLM          | [Vercel AI SDK](https://ai-sdk.dev)    |
@@ -35,51 +35,50 @@ yummy-chat/
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) >= 1.2
-- Node.js >= 20 (for LSP and editor tooling)
+- Node.js >= 20
 - Docker (optional, for Postgres and Docker Compose)
 
 ## Getting Started (Local Dev — No Docker Required for FE/BE)
 
 ```bash
 # 1. Install dependencies
-bun install
+npm install
 
 # 2. Copy environment variables
 cp .env.example .env
 # Edit .env with your values (defaults work for local dev)
 
 # 3. Start Postgres (optional — Docker convenience)
-bun run dev:db        # docker compose up -d postgres
+npm run dev:db        # docker compose up -d postgres
 
 # 4. Create database tables and seed test data
-bun run db:reset      # drops + recreates schema, runs migrations, seeds data
+npm run db:reset      # drops + recreates schema, runs migrations, seeds data
 
 # 5. Validate environment
-bun run check-env
+npm run check-env
 
 # 6. Start FE (Next.js on :3000) + BE (Hono on :3001) dev servers
-bun run dev
+npm run dev
 ```
 
-> **Docker is optional.** Only Postgres is recommended via Docker (`bun run dev:db`).
-> FE and BE run natively via Bun/Next.js — no Docker Compose needed for them.
+> **Docker is optional.** Only Postgres is recommended via Docker (`npm run dev:db`).
+> FE and BE run natively via Node.js/Next.js — no Docker Compose needed for them.
 
 ### Local Dev Workflow
 
 | Step | Command                    | What it does                               |
 | ---- | -------------------------- | ------------------------------------------ |
-| DB   | `bun run dev:db`           | Start Postgres in Docker (detached)       |
-| DB   | `bun run db:migrate`       | Apply pending Drizzle migrations           |
-| DB   | `bun run db:seed`          | Insert test users, skills, conversations   |
-| DB   | `bun run db:reset`         | Drop all data → migrate → seed (fresh)     |
-| Run  | `bun run dev`              | Start FE + BE concurrently via Turbo       |
-| Test | `bun run smoke:local`      | Verify env, DB, BE health, FE reachable    |
+| DB   | `npm run dev:db`           | Start Postgres in Docker (detached)       |
+| DB   | `npm run db:migrate`       | Apply pending Drizzle migrations           |
+| DB   | `npm run db:seed`          | Insert test users, skills, conversations   |
+| DB   | `npm run db:reset`         | Drop all data → migrate → seed (fresh)     |
+| Run  | `npm run dev`              | Start FE + BE concurrently via Turbo       |
+| Test | `npm run smoke:local`      | Verify env, DB, BE health, FE reachable    |
 
 ### Resetting Your Local Database
 
 ```bash
-bun run db:reset    # drops everything, re-migrates, re-seeds
+npm run db:reset    # drops everything, re-migrates, re-seeds
 ```
 
 This is safe for `development` and `test` environments only (guarded by `APP_ENV`).
@@ -88,19 +87,19 @@ This is safe for `development` and `test` environments only (guarded by `APP_ENV
 
 | Command            | Description                                     |
 | ------------------ | ----------------------------------------------- |
-| `bun run dev`      | Start all dev servers (FE + BE)                  |
-| `bun run dev:db`   | Start Postgres via Docker (`docker compose up -d postgres`) |
-| `bun run build`    | Build all packages and apps                      |
-| `bun run lint`     | Run Biome across workspace                       |
-| `bun run typecheck`| Run TypeScript type checking                     |
-| `bun run test`     | Run all tests                                    |
-| `bun run check`    | Lint + typecheck (CI gate)                       |
-| `bun run check-env`| Validate environment variables                   |
-| `bun run format`   | Format all files with Biome                      |
-| `bun run db:migrate`| Apply pending Drizzle migrations                |
-| `bun run db:seed`  | Insert seed data (test users, conversations)     |
-| `bun run db:reset` | Drop → migrate → seed (fresh slate)              |
-| `bun run smoke:local`| Run local smoke checks (env, DB, BE, FE)        |
+| `npm run dev`      | Start all dev servers (FE + BE)                  |
+| `npm run dev:db`   | Start Postgres via Docker (`docker compose up -d postgres`) |
+| `npm run build`    | Build all packages and apps                      |
+| `npm run lint`     | Run Biome across workspace                       |
+| `npm run typecheck`| Run TypeScript type checking                     |
+| `npm run test`     | Run all tests                                    |
+| `npm run check`    | Lint + typecheck (CI gate)                       |
+| `npm run check-env`| Validate environment variables                   |
+| `npm run format`   | Format all files with Biome                      |
+| `npm run db:migrate`| Apply pending Drizzle migrations                |
+| `npm run db:seed`  | Insert seed data (test users, conversations)     |
+| `npm run db:reset` | Drop → migrate → seed (fresh slate)              |
+| `npm run smoke:local`| Run local smoke checks (env, DB, BE, FE)        |
 
 ## Post-MVP Deferrals
 

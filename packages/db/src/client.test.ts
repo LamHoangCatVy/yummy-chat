@@ -1,11 +1,25 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import { drizzle } from "drizzle-orm/postgres-js"
 import { migrate } from "drizzle-orm/postgres-js/migrator"
-import { sql } from "./client.js"
+import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import * as schema from "./schema/index.js"
+
+const testDatabaseUrl = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+process.env.DATABASE_URL = testDatabaseUrl
+
+const { sql } = await import("./client.js")
 
 describe("@yummy/db", () => {
   beforeAll(async () => {
+    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
+    const existingDatabases = await adminSql`
+      SELECT 1 FROM pg_database WHERE datname = 'yummy_chat_test'
+    `
+    if (existingDatabases.length === 0) {
+      await adminSql`CREATE DATABASE yummy_chat_test`
+    }
+    await adminSql.end()
+
     await sql`DROP SCHEMA IF EXISTS public CASCADE`
     await sql`DROP SCHEMA IF EXISTS drizzle CASCADE`
     await sql`CREATE SCHEMA public`

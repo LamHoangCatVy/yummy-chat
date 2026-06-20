@@ -2,7 +2,7 @@
 
 import { API_V1 } from "@yummy/shared"
 import { useCallback, useRef, useState } from "react"
-import type { ChatMessage, StreamStatus } from "./types"
+import type { ChatMessage, FileAttachment, StreamStatus } from "./types"
 
 interface UseStreamChatOptions {
   /** Called when a streaming error occurs (for toast/notification). */
@@ -15,7 +15,11 @@ interface UseStreamChatReturn {
   /** Current stream status. */
   readonly status: StreamStatus
   /** Send a user message and stream the assistant response. */
-  readonly sendMessage: (content: string, conversationId: string) => Promise<void>
+  readonly sendMessage: (
+    content: string,
+    conversationId: string,
+    skillId?: string | null,
+  ) => Promise<void>
   /** Abort the current streaming response. */
   readonly stop: () => void
   /** Clear all messages (e.g., when starting a new conversation). */
@@ -51,7 +55,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
   }, [])
 
   const sendMessage = useCallback(
-    async (content: string, conversationId: string) => {
+    async (content: string, conversationId: string, skillId?: string | null) => {
       // Abort any existing stream
       abortRef.current?.abort()
 
@@ -85,7 +89,8 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
           body: JSON.stringify({
             conversationId,
             content,
-            model: "fake-provider",
+            model: "gpt-5-nano",
+            ...(skillId ? { skillId } : {}),
           }),
           signal: controller.signal,
         })
@@ -155,6 +160,18 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                     prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)),
                   )
                   setStatus("done")
+                } else if (
+                  typeof parsed === "object" &&
+                  parsed !== null &&
+                  "filename" in parsed &&
+                  "downloadUrl" in parsed
+                ) {
+                  const file = parsed as FileAttachment
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId ? { ...m, files: [...(m.files ?? []), file] } : m,
+                    ),
+                  )
                 } else if (typeof parsed === "object" && parsed !== null && "error" in parsed) {
                   const errorMsg = (parsed as { error: string }).error
                   setStatus("error")

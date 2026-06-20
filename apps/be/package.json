@@ -3,31 +3,36 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env ../../node_modules/tsx/dist/cli.mjs watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "test:auth": "bun test src/lib/auth.test.ts",
-    "test:authz": "bun test src/lib/authz.test.ts",
-    "test:conversations": "bun test src/routes/conversations.test.ts",
-    "test:security": "bun test src/lib/audit.test.ts src/lib/redact.test.ts",
-    "smoke:auth": "bun run src/smoke-auth.ts",
+    "test": "vitest run",
+    "test:auth": "vitest run src/lib/auth.test.ts",
+    "test:authz": "vitest run src/lib/authz.test.ts",
+    "test:conversations": "vitest run src/routes/conversations.test.ts",
+    "test:security": "vitest run src/lib/audit.test.ts src/lib/redact.test.ts",
+    "smoke:auth": "tsx src/smoke-auth.ts",
     "lint": "biome check src/"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
     "@hono/standard-validator": "^0.2.2",
     "@scalar/hono-api-reference": "^0.7.3",
-    "@yummy/db": "workspace:*",
-    "@yummy/shared": "workspace:*",
+    "@yummy/db": "*",
+    "@yummy/shared": "*",
     "better-auth": "^1.6.19",
+    "exceljs": "^4.4.0",
     "hono": "^4.7.4",
     "hono-openapi": "^1.3.0",
+    "openai": "^6.44.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.15.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "tsx": "^4.19.0"
   }
 }

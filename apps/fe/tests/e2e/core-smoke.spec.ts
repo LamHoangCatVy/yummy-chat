@@ -15,7 +15,7 @@ import { expect, test } from "@playwright/test"
  * - Fake LLM provider enabled (no real API key needed)
  * - A seeded test user (email: e2e@test.com, password: password123)
  *
- * Run: bun run smoke:core
+ * Run: npm run smoke:core
  */
 
 const TEST_USER = {

@@ -1,7 +1,10 @@
 "use client"
 
+import { Download, Sparkles, User } from "lucide-react"
 import { useCallback, useEffect, useRef } from "react"
-import type { ChatMessage } from "./types"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import type { ChatMessage, FileAttachment } from "./types"
 
 interface ChatTranscriptProps {
   readonly messages: readonly ChatMessage[]
@@ -11,10 +14,11 @@ interface ChatTranscriptProps {
 /**
  * Renders the scrollable message list with streaming text append.
  *
- * - Auto-scrolls to bottom on new content unless the user has scrolled up.
- * - User messages use accent-ghost background (per DESIGN.md chat-bubble spec).
- * - Assistant messages use surface-secondary background.
- * - Streaming state shows a blinking cursor.
+ * ChatGPT-style message rows (no bubbles):
+ * - Each message is a full-width row inside a centered max-w container.
+ * - A small circular avatar sits to the left; the name sits above the text.
+ * - User and assistant share the same layout — only the avatar/icon differs.
+ * - Streaming state shows a blinking cursor appended to the text.
  */
 export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -62,9 +66,9 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
 
   return (
     <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-[768px] px-spacing-4 py-spacing-6">
+      <div className="mx-auto max-w-[48rem] px-spacing-4 pb-spacing-6 pt-spacing-8">
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageRow key={message.id} message={message} userName={userName} />
         ))}
       </div>
     </div>
@@ -74,38 +78,82 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
 // ── Sub-components ──────────────────────────────────────────────────────────
 
 function EmptyState({ userName }: { readonly userName: string }) {
+  const firstName = userName.split(" ")[0] || userName
   return (
     <div className="text-center">
-      <h1 className="text-[2.25rem] font-semibold leading-[1.2] tracking-[-0.025em] text-text-primary">
-        Welcome back, {userName}
+      <h1 className="text-[2rem] font-semibold leading-[1.2] tracking-[-0.02em] text-text-primary">
+        What can I help with, {firstName}?
       </h1>
-      <p className="mt-spacing-4 text-[0.9375rem] leading-[1.6] text-text-secondary">
+      <p className="mt-spacing-3 text-[0.9375rem] leading-[1.6] text-text-secondary">
         Send a message to start a conversation.
       </p>
     </div>
   )
 }
 
-function MessageBubble({ message }: { readonly message: ChatMessage }) {
+function MessageRow({
+  message,
+  userName,
+}: {
+  readonly message: ChatMessage
+  readonly userName: string
+}) {
   const isUser = message.role === "user"
+  const label = isUser ? userName.split(" ")[0] || userName : "Assistant"
+  const displayContent = isUser ? message.content : stripXlsxJsonBlocks(message.content)
 
   return (
-    <div className="mb-spacing-4 flex flex-col">
-      <div
-        className={`rounded-radius-xl px-spacing-4 py-spacing-3 ${
-          isUser
-            ? "ml-auto max-w-[80%] bg-accent-ghost text-text-primary"
-            : "mr-auto max-w-[85%] bg-surface-secondary text-text-primary"
-        }`}
-      >
-        <div className="text-[0.6875rem] font-medium leading-[1.3] tracking-[0.05em] uppercase text-text-tertiary">
-          {isUser ? "You" : "Assistant"}
+    <div className="mb-spacing-8 flex gap-spacing-4">
+      <Avatar isUser={isUser} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[0.8125rem] font-semibold leading-[1.4] text-text-primary">
+          {label}
         </div>
-        <div className="mt-spacing-1 whitespace-pre-wrap text-[0.9375rem] leading-[1.6]">
-          {message.content}
-          {message.isStreaming && <StreamingCursor />}
+        <div className="mt-spacing-1 text-[0.9375rem] leading-[1.7] text-text-primary">
+          {isUser ? (
+            <span className="whitespace-pre-wrap">{displayContent}</span>
+          ) : (
+            <div className="prose-chat">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
+              {message.isStreaming && <StreamingCursor />}
+            </div>
+          )}
+          {message.files && message.files.length > 0 && <FileDownloads files={message.files} />}
         </div>
       </div>
+    </div>
+  )
+}
+
+function stripXlsxJsonBlocks(text: string): string {
+  return text.replace(/```xlsx-json\s*\n[\s\S]*?\n```/g, "").trim()
+}
+
+function FileDownloads({ files }: { readonly files: readonly FileAttachment[] }) {
+  return (
+    <div className="mt-spacing-3 flex flex-wrap gap-spacing-2">
+      {files.map((file) => (
+        <a
+          key={file.downloadUrl}
+          href={file.downloadUrl}
+          download={file.filename}
+          className="flex items-center gap-spacing-2 rounded-radius-md border border-border-subtle bg-surface-tertiary px-spacing-3 py-spacing-2 text-[0.8125rem] font-medium leading-[1.5] text-text-primary transition-colors duration-[150ms] hover:bg-surface-secondary"
+        >
+          <Download size={15} />
+          <span>{file.filename}</span>
+        </a>
+      ))}
+    </div>
+  )
+}
+
+function Avatar({ isUser }: { readonly isUser: boolean }) {
+  return (
+    <div
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-tertiary text-text-secondary"
+      aria-hidden="true"
+    >
+      {isUser ? <User size={15} /> : <Sparkles size={15} />}
     </div>
   )
 }

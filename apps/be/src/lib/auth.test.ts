@@ -1,19 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import * as schema from "@yummy/db/schema"
-import { drizzle } from "drizzle-orm/postgres-js"
-import { migrate } from "drizzle-orm/postgres-js/migrator"
-import postgres from "postgres"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { createTestDatabase } from "../test/db"
 
 // Set test env vars BEFORE any app imports (lazy getters in env.ts read at access time)
-process.env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/yummy_chat_test"
+const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-auth-tests-only"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
 
 // Dynamic import: ensures @yummy/db singleton connects to test DB via the env vars above
 const { createApp } = await import("../app")
-
-const testSql = postgres(process.env.DATABASE_URL)
 
 function extractCookies(res: Response): string {
   const setCookies = res.headers.getSetCookie()
@@ -22,26 +17,11 @@ function extractCookies(res: Response): string {
 
 describe("auth", () => {
   beforeAll(async () => {
-    // Create test database (ignore if already exists)
-    const adminSql = postgres("postgres://postgres:postgres@localhost:5432/postgres")
-    try {
-      await adminSql`CREATE DATABASE yummy_chat_test`
-    } catch {
-      // Database already exists — safe to ignore
-    }
-    await adminSql.end()
-
-    // Reset schema and run migrations
-    await testSql`DROP SCHEMA IF EXISTS public CASCADE`
-    await testSql`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await testSql`CREATE SCHEMA public`
-
-    const testDb = drizzle(testSql, { schema })
-    await migrate(testDb, { migrationsFolder: "../../packages/db/drizzle" })
+    await testDatabase.reset()
   })
 
   afterAll(async () => {
-    await testSql.end()
+    await testDatabase.close()
   })
 
   const testUser = {
@@ -190,8 +170,8 @@ describe("auth", () => {
       const setCookies = res.headers.getSetCookie()
       const sessionCookie = setCookies.find((c) => c.includes("session_token"))
       expect(sessionCookie).toBeTruthy()
-      expect(sessionCookie).toInclude("HttpOnly")
-      expect(sessionCookie).toInclude("SameSite=Lax")
+      expect(sessionCookie).toContain("HttpOnly")
+      expect(sessionCookie).toContain("SameSite=Lax")
     })
   })
 })

@@ -3,7 +3,7 @@
 import { ConversationProvider, useConversation } from "@/components/sidebar/conversation-context"
 import { ConversationList } from "@/components/sidebar/conversation-list"
 import { signOut } from "@/lib/auth-client"
-import { Cpu, Menu } from "lucide-react"
+import { LogOut, Menu, Settings } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import type { ReactNode } from "react"
@@ -17,11 +17,10 @@ interface ChatSidebarClientProps {
  * Client component that manages sidebar state, conversation switching,
  * and mobile drawer behavior.
  *
- * DESIGN.md layout spec:
- * - Sidebar: 260px fixed width, surface-secondary background
- * - Chat area: flex-1, surface-primary background
- * - Mobile (bp-md and below): hamburger toggle, drawer overlay
- * - Tonal-shift depth: no border between sidebar and chat (tonal shift alone)
+ * Layout:
+ * - Sidebar: surface-secondary background, tonal-shift depth (no border vs chat).
+ * - Chat area: surface-primary, flex-1.
+ * - Mobile (bp-md and below): hamburger toggle + drawer overlay.
  */
 export function ChatSidebarClient({ children, userName }: ChatSidebarClientProps) {
   return (
@@ -94,30 +93,7 @@ function ChatSidebarInner({
             onNewConversation={handleNewConversation}
           />
         </div>
-        {/* User section at bottom of sidebar */}
-        <div className="shrink-0 border-t border-border-subtle px-spacing-3 py-spacing-3">
-          <div className="flex items-center justify-between">
-            <span className="truncate text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
-              {userName}
-            </span>
-            <div className="flex items-center gap-spacing-2">
-              <Link
-                href="/settings/skills"
-                className="flex h-7 w-7 items-center justify-center rounded-radius-sm text-text-tertiary transition-colors duration-[150ms] hover:bg-surface-tertiary hover:text-text-secondary"
-                aria-label="Settings"
-              >
-                <Cpu size={14} />
-              </Link>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-[0.75rem] leading-[1.4] text-text-tertiary transition-colors duration-[150ms] hover:text-text-secondary"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        </div>
+        <UserFooter userName={userName} onSignOut={handleSignOut} />
       </aside>
 
       {/* Mobile overlay + drawer */}
@@ -145,29 +121,7 @@ function ChatSidebarInner({
                 onCloseMobile={() => setIsMobileMenuOpen(false)}
               />
             </div>
-            <div className="shrink-0 border-t border-border-subtle px-spacing-3 py-spacing-3">
-              <div className="flex items-center justify-between">
-                <span className="truncate text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
-                  {userName}
-                </span>
-                <div className="flex items-center gap-spacing-2">
-                  <Link
-                    href="/settings/skills"
-                    className="flex h-7 w-7 items-center justify-center rounded-radius-sm text-text-tertiary transition-colors duration-[150ms] hover:bg-surface-tertiary hover:text-text-secondary"
-                    aria-label="Settings"
-                  >
-                    <Cpu size={14} />
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="text-[0.75rem] leading-[1.4] text-text-tertiary transition-colors duration-[150ms] hover:text-text-secondary"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            </div>
+            <UserFooter userName={userName} onSignOut={handleSignOut} />
           </aside>
         </>
       )}
@@ -192,6 +146,41 @@ function ChatSidebarInner({
         {/* Chat content */}
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </main>
+    </div>
+  )
+}
+
+function UserFooter({
+  userName,
+  onSignOut,
+}: {
+  readonly userName: string
+  readonly onSignOut: () => void
+}) {
+  return (
+    <div className="shrink-0 border-t border-border-subtle px-spacing-2 py-spacing-2">
+      <div className="flex items-center justify-between rounded-radius-md px-spacing-2 py-spacing-1">
+        <span className="truncate text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
+          {userName}
+        </span>
+        <div className="flex shrink-0 items-center gap-spacing-half">
+          <Link
+            href="/settings/skills"
+            className="flex h-7 w-7 items-center justify-center rounded-radius-sm text-text-tertiary transition-colors duration-[150ms] hover:bg-surface-tertiary hover:text-text-primary"
+            aria-label="Settings"
+          >
+            <Settings size={15} />
+          </Link>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="flex h-7 w-7 items-center justify-center rounded-radius-sm text-text-tertiary transition-colors duration-[150ms] hover:bg-surface-tertiary hover:text-text-primary"
+            aria-label="Sign out"
+          >
+            <LogOut size={15} />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

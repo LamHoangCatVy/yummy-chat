@@ -21,6 +21,15 @@ export interface ChatMessage {
   readonly isStreaming: boolean
   /** Timestamp when the message was created (ISO string). */
   readonly createdAt: string
+  /** File attachments generated during the response (e.g., xlsx downloads). */
+  readonly files?: readonly FileAttachment[]
+}
+
+/** A file attachment from the assistant that the user can download. */
+export interface FileAttachment {
+  readonly filename: string
+  readonly downloadUrl: string
+  readonly mimeType: string
 }
 
 /** Possible states for the streaming connection. */

@@ -2,15 +2,19 @@ import type { ApiErrorResponse, ConversationId, MessageId, SkillId, UserId } fro
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
 import { z } from "zod"
-import { auditFromContext, emitAuditEvent } from "../lib/audit"
-import type { Actor } from "../lib/authz"
-import { createOrchestrator } from "../lib/chat/orchestrator"
-import { FakeLLMProvider } from "../lib/llm/fake-provider"
-import type { UsageMetadata } from "../lib/llm/provider"
-import { conversationRepository, messageRepository } from "../lib/repositories"
-import { requireAuth } from "../middleware/auth-guard"
-import type { RequestIdVariables } from "../middleware/request-id"
-import type { SessionVariables } from "../middleware/session"
+import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
+import type { Actor } from "../lib/authz.js"
+import { createOrchestrator } from "../lib/chat/orchestrator.js"
+import { env } from "../lib/env.js"
+import { FakeLLMProvider } from "../lib/llm/fake-provider.js"
+import { OpenAIProvider } from "../lib/llm/openai-provider.js"
+import type { LLMProvider } from "../lib/llm/provider.js"
+import type { UsageMetadata } from "../lib/llm/provider.js"
+import { extractXlsxJson, generateXlsxFile } from "../lib/llm/xlsx-generator.js"
+import { conversationRepository, messageRepository, skillRepository } from "../lib/repositories.js"
+import { requireAuth } from "../middleware/auth-guard.js"
+import type { RequestIdVariables } from "../middleware/request-id.js"
+import type { SessionVariables } from "../middleware/session.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
 
@@ -39,14 +43,17 @@ function meta(c: { get: (key: "requestId") => string }) {
 const chatStreamInputSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(100_000),
-  model: z.string().min(1).max(100).default("fake-provider"),
+  model: z.string().min(1).max(100).default("gpt-5-nano"),
   skillId: z.string().uuid().optional(),
   memoryEnabled: z.boolean().optional().default(false),
 })
 
 // ── Provider singleton (swap for real provider later) ───────────────────────
 
-function getProvider(): FakeLLMProvider {
+function getProvider(): LLMProvider {
+  if (env.openaiApiKey) {
+    return new OpenAIProvider(env.openaiApiKey, env.openaiModel)
+  }
   return new FakeLLMProvider()
 }
 
@@ -90,7 +97,17 @@ chatRouter.post("/stream", async (c) => {
   }
 
   const actor = actorFrom(c)
-  const { conversationId, content, model, skillId, memoryEnabled } = parsed.data
+  const { conversationId, content, model, memoryEnabled } = parsed.data
+  let { skillId } = parsed.data
+
+  // Auto-load the conversation's stored skill if none was sent in the request
+  if (!skillId) {
+    const skillRepo = skillRepository(actor)
+    const stored = await skillRepo.getConversationSkill(conversationId)
+    if (stored) {
+      skillId = stored.skillId as SkillId
+    }
+  }
 
   // Verify conversation ownership
   const convRepo = conversationRepository(actor)
@@ -246,6 +263,25 @@ chatRouter.post("/stream", async (c) => {
             model,
             usage: finalUsage,
           })
+        }
+
+        // Generate xlsx file if the response contains xlsx-json
+        const xlsxData = extractXlsxJson(accumulatedText)
+        if (xlsxData) {
+          try {
+            const fileMeta = await generateXlsxFile(xlsxData)
+            await stream.writeSSE({
+              event: "file",
+              data: JSON.stringify(fileMeta),
+            })
+          } catch (fileErr) {
+            const fileErrorMsg =
+              fileErr instanceof Error ? fileErr.message : "File generation failed"
+            await stream.writeSSE({
+              event: "error",
+              data: JSON.stringify({ error: fileErrorMsg, code: "FILE_GEN_ERROR" }),
+            })
+          }
         }
       }
     })

@@ -13,8 +13,8 @@
  * Exit 0 on success, 1 on any failure.
  *
  * Usage:
- *   bun run smoke:auth            (from repo root)
- *   bun run src/smoke-auth.ts     (from apps/be)
+ *   npm run smoke:auth            (from repo root)
+ *   npx tsx src/smoke-auth.ts     (from apps/be)
  */
 
 import * as schema from "@yummy/db/schema"

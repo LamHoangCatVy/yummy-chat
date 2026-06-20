@@ -29,9 +29,9 @@ export function ChatContainer({ userName }: ChatContainerProps) {
   const handleSend = useCallback(
     (content: string) => {
       if (!conversationId) return
-      void sendMessage(content, conversationId)
+      void sendMessage(content, conversationId, selectedSkillId)
     },
-    [sendMessage, conversationId],
+    [sendMessage, conversationId, selectedSkillId],
   )
 
   return (

@@ -1,17 +1,17 @@
 # ── Stage 1: Install dependencies ────────────────────────────────────────────
-FROM oven/bun:1-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 
 # Copy package files for the whole monorepo
-COPY package.json bun.lock ./
+COPY package.json package-lock.json ./
 COPY apps/be/package.json ./apps/be/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # ── Stage 2: Production runtime ─────────────────────────────────────────────
-FROM oven/bun:1-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -22,7 +22,7 @@ RUN apk add --no-cache curl
 
 RUN addgroup -S yummy && adduser -S yummy -G yummy
 
-# Copy dependencies and source
+# Copy dependencies and source (tsx will handle TypeScript at runtime)
 COPY --from=deps --chown=yummy:yummy /app/node_modules ./node_modules
 COPY --from=deps --chown=yummy:yummy /app/apps/be/node_modules ./apps/be/node_modules
 COPY --from=deps --chown=yummy:yummy /app/packages ./packages
@@ -36,4 +36,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3001/api/v1/health || exit 1
 
-CMD ["bun", "run", "apps/be/src/index.ts"]
+CMD ["npx", "tsx", "apps/be/src/index.ts"]

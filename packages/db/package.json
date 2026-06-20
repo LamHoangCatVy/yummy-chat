@@ -19,11 +19,11 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:migrate:test": "bun run src/migrate.ts",
-    "db:seed": "bun run src/seed.ts",
-    "db:seed:test": "bun run src/seed.ts",
+    "db:migrate:test": "tsx src/migrate.ts",
+    "db:seed": "tsx src/seed.ts",
+    "db:seed:test": "tsx src/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "vitest run",
     "lint": "biome check src/"
   },
   "dependencies": {
@@ -31,8 +31,8 @@
     "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "@types/bun": "latest",
     "drizzle-kit": "^0.31.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.3"
   }
 }

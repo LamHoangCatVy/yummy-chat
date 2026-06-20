@@ -10,11 +10,11 @@ import {
 import { Hono } from "hono"
 import type { Context } from "hono"
 import { z } from "zod"
-import type { Actor } from "../lib/authz"
-import { conversationRepository, messageRepository } from "../lib/repositories"
-import { requireAuth } from "../middleware/auth-guard"
-import type { RequestIdVariables } from "../middleware/request-id"
-import type { SessionVariables } from "../middleware/session"
+import type { Actor } from "../lib/authz.js"
+import { conversationRepository, messageRepository } from "../lib/repositories.js"
+import { requireAuth } from "../middleware/auth-guard.js"
+import type { RequestIdVariables } from "../middleware/request-id.js"
+import type { SessionVariables } from "../middleware/session.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
 

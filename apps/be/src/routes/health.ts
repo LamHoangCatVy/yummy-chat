@@ -2,7 +2,7 @@ import { API_V1 } from "@yummy/shared"
 import type { ApiResponse } from "@yummy/shared"
 import { Hono } from "hono"
 import { describeRoute } from "hono-openapi"
-import type { RequestIdVariables } from "../middleware/request-id"
+import type { RequestIdVariables } from "../middleware/request-id.js"
 
 export const healthRouter = new Hono<{ Variables: RequestIdVariables }>()
 

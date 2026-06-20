@@ -1,8 +1,10 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "vitest"
 import { readdir, readFile } from "node:fs/promises"
-import { join } from "node:path"
+import { join, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
 
-const SRC_DIR = join(import.meta.dir, "..", "src")
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const SRC_DIR = join(__dirname, "..", "src")
 
 async function collectTsFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { recursive: true })

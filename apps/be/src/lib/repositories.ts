@@ -9,7 +9,7 @@ import {
   userMemorySettings,
 } from "@yummy/db/schema"
 import type { ConversationId, MemoryId, MessageId, SkillId } from "@yummy/shared"
-import type { Actor } from "./authz"
+import type { Actor } from "./authz.js"
 
 // ── Inferred row types ──────────────────────────────────────────────────────
 

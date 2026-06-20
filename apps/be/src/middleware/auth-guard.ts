@@ -1,8 +1,8 @@
 import type { ApiErrorResponse } from "@yummy/shared"
 import { createMiddleware } from "hono/factory"
-import { auditFromContext, emitAuditEvent } from "../lib/audit"
-import type { RequestIdVariables } from "./request-id"
-import type { SessionVariables } from "./session"
+import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
+import type { RequestIdVariables } from "./request-id.js"
+import type { SessionVariables } from "./session.js"
 
 type AuthGuardVariables = RequestIdVariables & SessionVariables
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import type { z } from "zod"
 import {
   API_V1,
@@ -208,8 +208,10 @@ describe("branded ID schemas", () => {
     expect(userIdSchema.parse(UUID)).toBe(UUID as UserId)
   })
 
-  it("userIdSchema rejects non-UUID", () => {
-    expect(() => userIdSchema.parse("not-a-uuid")).toThrow()
+  it("userIdSchema accepts non-UUID Better Auth IDs", () => {
+    expect(userIdSchema.parse("YAUT0yg4k651uTM0figQ2dBaBMyhRyEd")).toBe(
+      "YAUT0yg4k651uTM0figQ2dBaBMyhRyEd" as UserId,
+    )
   })
 
   it("conversationIdSchema accepts valid UUID", () => {
@@ -332,7 +334,7 @@ describe("API_V1 routes", () => {
 
   it("has expected route keys", () => {
     const keys = entries.map(([k]) => k).sort()
-    expect(keys).toEqual(["AUTH", "CHAT", "CONVERSATIONS", "HEALTH", "MEMORY", "SKILLS"])
+    expect(keys).toEqual(["AUTH", "CHAT", "CONVERSATIONS", "FILES", "HEALTH", "MEMORY", "SKILLS"])
   })
 
   it("route values match expected paths", () => {
@@ -342,6 +344,7 @@ describe("API_V1 routes", () => {
     expect(API_V1.SKILLS).toBe("/api/v1/skills")
     expect(API_V1.MEMORY).toBe("/api/v1/memory")
     expect(API_V1.HEALTH).toBe("/api/v1/health")
+    expect(API_V1.FILES).toBe("/api/v1/files")
   })
 })
 

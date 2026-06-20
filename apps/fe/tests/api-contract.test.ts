@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "vitest"
 import {
   healthResponseSchema,
   conversationSchema,
@@ -78,7 +78,7 @@ describe("Contract: Shared Zod schemas accept BE response shapes", () => {
     expect(() => conversationSchema.parse(raw)).toThrow()
   })
 
-  test("conversationListResponseSchema parses valid list", () => {
+  test("conversationListResponseSchema parses valid list without cursor", () => {
     const raw = {
       conversations: [
         {
@@ -96,16 +96,29 @@ describe("Contract: Shared Zod schemas accept BE response shapes", () => {
           updatedAt: "2025-01-02T00:01:00.000Z",
         },
       ],
-      total: 2,
+      nextCursor: null,
     }
     const result = conversationListResponseSchema.parse(raw)
     expect(result.conversations).toHaveLength(2)
-    expect(result.total).toBe(2)
+    expect(result.nextCursor).toBeNull()
   })
 
-  test("conversationListResponseSchema rejects negative total", () => {
-    const raw = { conversations: [], total: -1 }
-    expect(() => conversationListResponseSchema.parse(raw)).toThrow()
+  test("conversationListResponseSchema parses list with pagination cursor", () => {
+    const raw = {
+      conversations: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440000",
+          userId: "550e8400-e29b-41d4-a716-446655440001",
+          title: "Chat 1",
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-01T00:01:00.000Z",
+        },
+      ],
+      nextCursor: "550e8400-e29b-41d4-a716-446655440002",
+    }
+    const result = conversationListResponseSchema.parse(raw)
+    expect(result.conversations).toHaveLength(1)
+    expect(result.nextCursor).toBe("550e8400-e29b-41d4-a716-446655440002")
   })
 
   test("sendMessageInputSchema parses valid input", () => {
@@ -388,7 +401,7 @@ describe("Contract: FE client error handling", () => {
 
     try {
       await checkHealth()
-      expect.fail("Expected ApiError to be thrown")
+      throw new Error("Expected ApiError to be thrown")
     } catch (err) {
       expect(err).toBeInstanceOf(ApiError)
       if (err instanceof ApiError) {
