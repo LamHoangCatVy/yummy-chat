@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { ChatMessage, FileAttachment } from "./types"
+import { useTypewriter } from "./use-typewriter"
 
 interface ChatTranscriptProps {
   readonly messages: readonly ChatMessage[]
@@ -24,6 +25,7 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const prevMessageCountRef = useRef(0)
+  const lastMessageContentLengthRef = useRef(0)
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current
@@ -43,6 +45,15 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
   const currentCount = messages.length
   if (currentCount !== prevMessageCountRef.current) {
     prevMessageCountRef.current = currentCount
+    if (isAtBottomRef.current) {
+      requestAnimationFrame(scrollToBottom)
+    }
+  }
+
+  const lastMessage = messages[messages.length - 1]
+  const currentLastMessageContentLength = lastMessage?.content.length ?? 0
+  if (currentLastMessageContentLength !== lastMessageContentLengthRef.current) {
+    lastMessageContentLengthRef.current = currentLastMessageContentLength
     if (isAtBottomRef.current) {
       requestAnimationFrame(scrollToBottom)
     }
@@ -113,14 +124,28 @@ function MessageRow({
           {isUser ? (
             <span className="whitespace-pre-wrap">{displayContent}</span>
           ) : (
-            <div className="prose-chat">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
-              {message.isStreaming && <StreamingCursor />}
-            </div>
+            <AssistantMessageContent content={displayContent} isStreaming={message.isStreaming} />
           )}
           {message.files && message.files.length > 0 && <FileDownloads files={message.files} />}
         </div>
       </div>
+    </div>
+  )
+}
+
+function AssistantMessageContent({
+  content,
+  isStreaming,
+}: {
+  readonly content: string
+  readonly isStreaming: boolean
+}) {
+  const { text: typedText, isTyping } = useTypewriter(content, isStreaming)
+
+  return (
+    <div className="prose-chat">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{typedText}</ReactMarkdown>
+      {isTyping && <StreamingCursor />}
     </div>
   )
 }

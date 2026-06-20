@@ -100,7 +100,7 @@ export const appendMessageInputSchema = z.object({
 
 export const paginationInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().datetime().optional(),
 })
 
 export const conversationListResponseSchema = z.object({
@@ -136,6 +136,26 @@ export const memoryListResponseSchema = z.object({
   entries: z.array(memoryEntrySchema),
 })
 
+export const modelItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().optional(),
+})
+
+export const modelListResponseSchema = z.object({
+  models: z.array(modelItemSchema),
+})
+
+export const advancedSettingsGetResponseSchema = z.object({
+  hasApiKey: z.boolean(),
+  endpoint: z.string().nullable(),
+  selectedModel: z.string().nullable(),
+})
+
+export const advancedSettingsPutInputSchema = z.object({
+  apiKey: z.string().min(1).optional(),
+  endpoint: z.string().url().optional(),
+})
+
 export const healthResponseSchema = z.object({
   status: z.enum(["ok", "degraded", "error"]),
   version: z.string(),
@@ -160,4 +180,8 @@ export type PaginationInput = z.infer<typeof paginationInputSchema>
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>
 export type SkillListResponse = z.infer<typeof skillListResponseSchema>
 export type MemoryListResponse = z.infer<typeof memoryListResponseSchema>
+export type ModelItem = z.infer<typeof modelItemSchema>
+export type ModelListResponse = z.infer<typeof modelListResponseSchema>
+export type AdvancedSettingsGetResponse = z.infer<typeof advancedSettingsGetResponseSchema>
+export type AdvancedSettingsPutInput = z.infer<typeof advancedSettingsPutInputSchema>
 export type HealthResponse = z.infer<typeof healthResponseSchema>

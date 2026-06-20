@@ -19,4 +19,10 @@ test.describe("Settings pages accessibility", () => {
     await page.goto("/settings/memory")
     await checkA11yNoViolations(page, "memory settings page")
   })
+
+  test("advanced settings page has no serious/critical a11y violations", async ({ page }) => {
+    await loginAsTestUser(page)
+    await page.goto("/settings/advanced")
+    await checkA11yNoViolations(page, "advanced settings page")
+  })
 })

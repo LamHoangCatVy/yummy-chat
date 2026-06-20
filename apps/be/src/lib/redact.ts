@@ -8,6 +8,9 @@ const REDACTED_KEYS = new Set([
   "api_key",
   "apikey",
   "api-key",
+  "apiKey",
+  "encryptedApiKey",
+  "user_api_key",
   "authorization",
   "cookie",
   "session_token",
@@ -16,7 +19,7 @@ const REDACTED_KEYS = new Set([
   "credit_card",
   "creditCard",
   "ssn",
-  "betTER_AUTH_SECRET",
+
   "DATABASE_URL",
   "LLM_PROVIDER_API_KEY",
   "BETTER_AUTH_SECRET",
@@ -126,4 +129,28 @@ export function redactUrl(url: string): string {
 export function redactAuthHeader(value: string | undefined): string {
   if (!value) return ""
   return REDACTED
+}
+
+/**
+ * Redact secret-like substrings inside a plain string.
+ *
+ * Uses the same SECRET_PATTERNS but with anchors stripped and word boundaries
+ * applied so secrets embedded in longer error messages (e.g. SSE errors)
+ * are caught.  Patterns that are too broad for substring matching (e.g. the
+ * generic 32-char alphanumeric token heuristic) are omitted to avoid false
+ * positives.
+ */
+export function redactString(str: string): string {
+  let result = str
+
+  // sk-… OpenAI-style keys
+  result = result.replace(/\bsk-[a-zA-Z0-9-]{20,}\b/g, REDACTED)
+  // ghp_… GitHub PATs
+  result = result.replace(/\bghp_[a-zA-Z0-9]{36}\b/g, REDACTED)
+  // Bearer tokens in headers
+  result = result.replace(/Bearer\s+[^\s,;]+/gi, REDACTED)
+  // postgres:// URLs with credentials
+  result = result.replace(/postgres:\/\/[^@\s]*?:\S+?@/gi, REDACTED)
+
+  return result
 }

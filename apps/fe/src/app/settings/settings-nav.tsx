@@ -1,16 +1,32 @@
 "use client"
 
-import { Brain, Cpu, Settings } from "lucide-react"
+import { signOut } from "@/lib/auth-client"
+import { Brain, Cpu, LogOut, Settings, Wrench } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useCallback } from "react"
 
 const NAV_ITEMS = [
   { href: "/settings/skills", label: "Skills", icon: Cpu },
   { href: "/settings/memory", label: "Memory", icon: Brain },
+  { href: "/settings/advanced", label: "Advanced", icon: Wrench },
 ] as const
 
-export function SettingsNav() {
+interface SettingsNavProps {
+  readonly userName: string
+}
+
+export function SettingsNav({ userName }: SettingsNavProps) {
   const pathname = usePathname()
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut()
+    } catch {
+      // Force redirect even if sign-out API fails
+    }
+    window.location.href = "/login"
+  }, [])
 
   return (
     <aside className="hidden w-[220px] shrink-0 border-r border-border-subtle bg-surface-secondary md:flex md:flex-col">
@@ -37,6 +53,21 @@ export function SettingsNav() {
           )
         })}
       </nav>
+      <div className="shrink-0 border-t border-border-subtle px-spacing-2 py-spacing-2">
+        <div className="flex items-center justify-between rounded-radius-md px-spacing-2 py-spacing-1">
+          <span className="truncate text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
+            {userName}
+          </span>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="flex h-7 w-7 items-center justify-center rounded-radius-sm text-text-tertiary transition-colors duration-[150ms] hover:bg-surface-tertiary hover:text-text-primary"
+            aria-label="Sign out"
+          >
+            <LogOut size={15} />
+          </button>
+        </div>
+      </div>
     </aside>
   )
 }

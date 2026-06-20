@@ -9,11 +9,12 @@ interface SettingsLayoutProps {
 
 // biome-ignore lint/style/noDefaultExport: Next.js App Router requires default export for layout
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
-  await requireSession()
+  const { user } = await requireSession()
+  const userName = user.name || user.email
 
   return (
     <div className="flex min-h-screen bg-surface-primary">
-      <SettingsNav />
+      <SettingsNav userName={userName} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[640px] px-spacing-6 py-spacing-8">{children}</div>
       </main>

@@ -1,9 +1,16 @@
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import * as schema from "@yummy/db/schema"
 import { drizzle } from "drizzle-orm/postgres-js"
 import { migrate } from "drizzle-orm/postgres-js/migrator"
 import postgres from "postgres"
 
 const adminDatabaseUrl = "postgres://postgres:postgres@localhost:5432/postgres"
+
+const migrationsFolder = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../../packages/db/drizzle",
+)
 
 type TestDatabase = {
   readonly databaseUrl: string
@@ -47,7 +54,7 @@ export async function createTestDatabase(moduleUrl: string): Promise<TestDatabas
       await sql`CREATE SCHEMA public`
 
       const testDb = drizzle(sql, { schema })
-      await migrate(testDb, { migrationsFolder: "../../packages/db/drizzle" })
+      await migrate(testDb, { migrationsFolder })
     },
     close: async () => {
       await sql.end()

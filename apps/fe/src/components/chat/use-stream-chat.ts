@@ -1,5 +1,6 @@
 "use client"
 
+import { listMessages } from "@/lib/api"
 import { API_V1 } from "@yummy/shared"
 import { useCallback, useRef, useState } from "react"
 import type { ChatMessage, FileAttachment, StreamStatus } from "./types"
@@ -7,6 +8,8 @@ import type { ChatMessage, FileAttachment, StreamStatus } from "./types"
 interface UseStreamChatOptions {
   /** Called when a streaming error occurs (for toast/notification). */
   onError?: (error: string) => void
+  /** Called after the first assistant response in a conversation completes. */
+  onFirstExchangeComplete?: () => void
 }
 
 interface UseStreamChatReturn {
@@ -19,11 +22,14 @@ interface UseStreamChatReturn {
     content: string,
     conversationId: string,
     skillId?: string | null,
+    model?: string | null,
   ) => Promise<void>
   /** Abort the current streaming response. */
   readonly stop: () => void
   /** Clear all messages (e.g., when starting a new conversation). */
   readonly clear: () => void
+  /** Load existing messages for a conversation from the backend. */
+  readonly loadMessages: (conversationId: string) => Promise<void>
 }
 
 /**
@@ -40,6 +46,9 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
   const [messages, setMessages] = useState<readonly ChatMessage[]>([])
   const [status, setStatus] = useState<StreamStatus>("idle")
   const abortRef = useRef<AbortController | null>(null)
+  const firstExchangeRef = useRef(false)
+  const optionsRef = useRef(options)
+  optionsRef.current = options
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
@@ -52,10 +61,38 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
     abortRef.current = null
     setMessages([])
     setStatus("idle")
+    firstExchangeRef.current = false
+  }, [])
+
+  const loadMessages = useCallback(async (conversationId: string) => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setStatus("idle")
+
+    try {
+      const result = await listMessages(conversationId)
+      const loaded: ChatMessage[] = result.data.map((m) => ({
+        id: m.id,
+        role: m.role === "system" ? "assistant" : (m.role as "user" | "assistant"),
+        content: m.content,
+        isStreaming: false,
+        createdAt: m.createdAt,
+      }))
+      setMessages(loaded)
+      firstExchangeRef.current = loaded.length === 0
+    } catch {
+      setMessages([])
+      firstExchangeRef.current = true
+    }
   }, [])
 
   const sendMessage = useCallback(
-    async (content: string, conversationId: string, skillId?: string | null) => {
+    async (
+      content: string,
+      conversationId: string,
+      skillId?: string | null,
+      model?: string | null,
+    ) => {
       // Abort any existing stream
       abortRef.current?.abort()
 
@@ -89,7 +126,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
           body: JSON.stringify({
             conversationId,
             content,
-            model: "gpt-5-nano",
+            model: model || "gpt-5-nano",
             ...(skillId ? { skillId } : {}),
           }),
           signal: controller.signal,
@@ -223,5 +260,5 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
     [options],
   )
 
-  return { messages, status, sendMessage, stop, clear }
+  return { messages, status, sendMessage, stop, clear, loadMessages }
 }

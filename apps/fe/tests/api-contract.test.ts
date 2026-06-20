@@ -1,26 +1,35 @@
-import { describe, test, expect } from "vitest"
 import {
-  healthResponseSchema,
-  conversationSchema,
-  conversationListResponseSchema,
-  sendMessageResponseSchema,
-  sendMessageInputSchema,
-  createConversationInputSchema,
-  skillListResponseSchema,
-  memoryListResponseSchema,
+  advancedSettingsGetResponseSchema,
+  advancedSettingsPutInputSchema,
   chatMessageSchema,
+  conversationListResponseSchema,
+  conversationSchema,
+  createConversationInputSchema,
+  healthResponseSchema,
+  memoryListResponseSchema,
+  modelListResponseSchema,
+  sendMessageInputSchema,
+  sendMessageResponseSchema,
+  skillListResponseSchema,
 } from "@yummy/shared"
 import type {
   ApiErrorResponse,
-  ValidationError,
   AuthError,
-  NotFoundError,
   ForbiddenError,
-  RateLimitError,
   InternalError,
+  NotFoundError,
+  RateLimitError,
   UnsupportedMediaTypeError,
+  ValidationError,
 } from "@yummy/shared"
-import { ApiError, checkHealth } from "../src/lib/api"
+import { describe, expect, test } from "vitest"
+import {
+  ApiError,
+  checkHealth,
+  fetchModels,
+  getAdvancedSettings,
+  updateAdvancedSettings,
+} from "../src/lib/api"
 
 // ---------------------------------------------------------------------------
 // 1. Schema conformance – shared Zod schemas accept BE response shapes
@@ -180,7 +189,7 @@ describe("Contract: Shared Zod schemas accept BE response shapes", () => {
     }
     const result = skillListResponseSchema.parse(raw)
     expect(result.skills).toHaveLength(1)
-    expect(result.skills[0]!.name).toBe("weather")
+    expect(result.skills[0]?.name).toBe("weather")
   })
 
   test("memoryListResponseSchema parses valid entries", () => {
@@ -198,7 +207,36 @@ describe("Contract: Shared Zod schemas accept BE response shapes", () => {
     }
     const result = memoryListResponseSchema.parse(raw)
     expect(result.entries).toHaveLength(1)
-    expect(result.entries[0]!.key).toBe("preference")
+    expect(result.entries[0]?.key).toBe("preference")
+  })
+
+  test("advancedSettingsGetResponseSchema parses configured state", () => {
+    const raw = {
+      hasApiKey: true,
+      endpoint: "https://api.openai.com/v1",
+      selectedModel: "gpt-4o-mini",
+    }
+    const result = advancedSettingsGetResponseSchema.parse(raw)
+    expect(result.hasApiKey).toBe(true)
+    expect(result.endpoint).toBe("https://api.openai.com/v1")
+    expect(result.selectedModel).toBe("gpt-4o-mini")
+  })
+
+  test("advancedSettingsPutInputSchema parses endpoint update", () => {
+    const result = advancedSettingsPutInputSchema.parse({
+      apiKey: "sk-test",
+      endpoint: "https://api.openai.com/v1",
+    })
+    expect(result.apiKey).toBe("sk-test")
+    expect(result.endpoint).toBe("https://api.openai.com/v1")
+  })
+
+  test("modelListResponseSchema parses model list", () => {
+    const result = modelListResponseSchema.parse({
+      models: [{ id: "gpt-4o-mini", label: "GPT-4o mini" }],
+    })
+    expect(result.models[0]?.id).toBe("gpt-4o-mini")
+    expect(result.models[0]?.label).toBe("GPT-4o mini")
   })
 
   test("chatMessageSchema parses valid message with optional fields", () => {
@@ -293,7 +331,7 @@ describe("Contract: Error envelope shape consistency", () => {
     expect("fields" in envelope.error).toBe(true)
     const typed = envelope.error as ValidationError
     expect(typed.fields).toHaveLength(2)
-    expect(typed.fields[0]!.field).toBe("title")
+    expect(typed.fields[0]?.field).toBe("title")
   })
 
   test("FORBIDDEN_ERROR envelope", () => {
@@ -423,5 +461,127 @@ describe("Contract: FE client error handling", () => {
 
     await expect(checkHealth()).rejects.toThrow()
     globalThis.fetch = originalFetch
+  })
+
+  test("getAdvancedSettings fetches the advanced settings endpoint", async () => {
+    const originalFetch = globalThis.fetch
+    let requestedPath = ""
+    let requestedInit: RequestInit | undefined
+
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      requestedPath = String(input)
+      requestedInit = init
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: { hasApiKey: true, endpoint: "https://api.openai.com/v1", selectedModel: null },
+          meta: { timestamp: "2025-01-01T00:00:00.000Z", requestId: "req-settings" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    }) as typeof fetch
+
+    try {
+      const result = await getAdvancedSettings()
+      expect(requestedPath).toBe("/api/v1/settings/advanced")
+      expect(requestedInit?.method).toBeUndefined()
+      expect(result.hasApiKey).toBe(true)
+      expect(result.endpoint).toBe("https://api.openai.com/v1")
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test("updateAdvancedSettings PUTs the advanced settings endpoint", async () => {
+    const originalFetch = globalThis.fetch
+    let requestedPath = ""
+    let requestedInit: RequestInit | undefined
+
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      requestedPath = String(input)
+      requestedInit = init
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: { hasApiKey: true, endpoint: "https://api.openai.com/v1", selectedModel: null },
+          meta: { timestamp: "2025-01-01T00:00:00.000Z", requestId: "req-update" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    }) as typeof fetch
+
+    try {
+      const result = await updateAdvancedSettings({
+        apiKey: "sk-test",
+        endpoint: "https://api.openai.com/v1",
+      })
+      expect(requestedPath).toBe("/api/v1/settings/advanced")
+      expect(requestedInit?.method).toBe("PUT")
+      expect(JSON.parse(String(requestedInit?.body))).toEqual({
+        apiKey: "sk-test",
+        endpoint: "https://api.openai.com/v1",
+      })
+      expect(result.hasApiKey).toBe(true)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test("fetchModels fetches the models endpoint", async () => {
+    const originalFetch = globalThis.fetch
+    let requestedPath = ""
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      requestedPath = String(input)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: { models: [{ id: "gpt-4o-mini", label: "GPT-4o mini" }] },
+          meta: { timestamp: "2025-01-01T00:00:00.000Z", requestId: "req-models" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    }) as typeof fetch
+
+    try {
+      const result = await fetchModels()
+      expect(requestedPath).toBe("/api/v1/models")
+      expect(result.models[0]?.id).toBe("gpt-4o-mini")
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test("updateAdvancedSettings propagates ApiError on failed response", async () => {
+    const originalFetch = globalThis.fetch
+    const errorBody: ApiErrorResponse = {
+      success: false,
+      error: {
+        type: "VALIDATION_ERROR",
+        message: "Invalid request body",
+        statusCode: 400,
+        fields: [{ field: "endpoint", message: "Invalid URL" }],
+      },
+      meta: { timestamp: "2025-01-01T00:00:00.000Z", requestId: "req-invalid" },
+    }
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(errorBody), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch
+
+    try {
+      await updateAdvancedSettings({ endpoint: "https://api.openai.com/v1" })
+      throw new Error("Expected ApiError to be thrown")
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError)
+      if (err instanceof ApiError) {
+        expect(err.statusCode).toBe(422)
+        expect(err.errorResponse.error.type).toBe("VALIDATION_ERROR")
+      }
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

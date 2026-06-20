@@ -1,17 +1,28 @@
-import type { LLMProvider, StreamChunk, StreamRequest } from "./provider.js"
+import type {
+  CompleteRequest,
+  CompleteResponse,
+  LLMProvider,
+  StreamChunk,
+  StreamRequest,
+} from "./provider.js"
 
 export class OpenAIProvider implements LLMProvider {
   private readonly apiKey: string
   private readonly defaultModel: string
+  private readonly baseURL: string | undefined
 
-  constructor(apiKey: string, defaultModel: string) {
+  constructor(apiKey: string, defaultModel: string, baseURL?: string) {
     this.apiKey = apiKey
     this.defaultModel = defaultModel
+    this.baseURL = baseURL
   }
 
   async *stream(request: StreamRequest, signal?: AbortSignal): AsyncIterable<StreamChunk> {
     const { OpenAI } = await import("openai")
-    const client = new OpenAI({ apiKey: this.apiKey })
+    const client = new OpenAI({
+      apiKey: this.apiKey,
+      ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+    })
 
     const messages = request.systemPrompt
       ? [{ role: "system" as const, content: request.systemPrompt }, ...request.messages]
@@ -69,6 +80,39 @@ export class OpenAIProvider implements LLMProvider {
       }
       const message = err instanceof Error ? err.message : "OpenAI API error"
       yield { type: "error", error: message, code: "PROVIDER_ERROR" }
+    }
+  }
+
+  async complete(request: CompleteRequest, signal?: AbortSignal): Promise<CompleteResponse> {
+    const { OpenAI } = await import("openai")
+    const client = new OpenAI({
+      apiKey: this.apiKey,
+      ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+    })
+
+    const messages = request.systemPrompt
+      ? [{ role: "system" as const, content: request.systemPrompt }, ...request.messages]
+      : [...request.messages]
+
+    const completion = await client.chat.completions.create(
+      {
+        model: request.model || this.defaultModel,
+        messages,
+        stream: false,
+        ...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
+      },
+      { signal },
+    )
+
+    const content = completion.choices[0]?.message?.content ?? ""
+    const usage = completion.usage
+    return {
+      content,
+      usage: {
+        inputTokens: usage?.prompt_tokens ?? 0,
+        outputTokens: usage?.completion_tokens ?? 0,
+        totalTokens: usage?.total_tokens ?? 0,
+      },
     }
   }
 }

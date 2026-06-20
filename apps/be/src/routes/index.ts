@@ -8,9 +8,12 @@ import { chatRouter } from "./chat.js"
 import { conversationSkillRouter } from "./conversation-skill.js"
 import { conversationsRouter } from "./conversations.js"
 import { filesRouter } from "./files.js"
+import { generateTitleRouter } from "./generate-title.js"
 import { healthRouter } from "./health.js"
 import { memoryRouter } from "./memory.js"
 import { messagesRouter } from "./messages.js"
+import { modelsRouter } from "./models.js"
+import { settingsRouter } from "./settings.js"
 import { skillsRouter } from "./skills.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
@@ -23,10 +26,13 @@ export function createApiRouter(auth: Auth) {
   router.route(API_V1.CONVERSATIONS, conversationsRouter)
   router.route(`${API_V1.CONVERSATIONS}/:id/messages`, messagesRouter)
   router.route(`${API_V1.CONVERSATIONS}/:id/skill`, conversationSkillRouter)
+  router.route(`${API_V1.CONVERSATIONS}/:id/generate-title`, generateTitleRouter)
   router.route(API_V1.SKILLS, skillsRouter)
   router.route(API_V1.CHAT, chatRouter)
   router.route(API_V1.MEMORY, memoryRouter)
   router.route(API_V1.FILES, filesRouter)
+  router.route(API_V1.SETTINGS, settingsRouter)
+  router.route(API_V1.MODELS, modelsRouter)
 
   return router
 }

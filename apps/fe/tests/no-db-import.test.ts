@@ -1,7 +1,7 @@
-import { describe, test, expect } from "vitest"
-import { readdir, readFile } from "node:fs/promises"
-import { join, dirname } from "node:path"
+import { readFile, readdir } from "node:fs/promises"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { describe, expect, test } from "vitest"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const SRC_DIR = join(__dirname, "..", "src")

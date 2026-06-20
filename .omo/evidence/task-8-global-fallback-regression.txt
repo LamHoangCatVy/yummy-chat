@@ -1,0 +1,48 @@
+=== Backend Test Results - BYOK & SSE Redaction Regression ===
+Date: 2026-06-20
+Command: npm test --workspace @yummy/be
+
+=== SUMMARY ===
+Test Files: 14 passed (14)
+Total Tests: 209 passed (209)
+Duration: 4.97s
+
+=== KEY TEST SUITES ===
+
+✓ src/routes/chat.test.ts (12 tests) — PASSED
+  - chat streaming API > POST /api/v1/chat/stream (5 tests)
+    ✓ returns 401 without session
+    ✓ returns 400 for invalid body
+    ✓ returns 404 for another user's conversation
+    ✓ streams ≥3 text chunks before finish with increasing timestamps
+    ✓ accumulated text matches expected fake provider output
+    ✓ persists user message in conversation
+  - BYOK provider resolution (2 tests)
+    ✓ resolves to FakeLLMProvider when user has no BYOK settings
+    ✓ uses BYOK settings when user has them configured
+  - SSE error redaction (4 tests)
+    ✓ redact() redacts sensitive object keys
+    ✓ redact() redacts authorization values
+    ✓ redact() catches standalone sk- keys via secret pattern
+    ✓ SSE error events from provider are redacted
+
+✓ src/lib/encryption.test.ts (17 tests) — PASSED
+✓ src/lib/redact.test.ts (22 tests) — PASSED
+✓ src/lib/llm/fake-provider.test.ts (6 tests) — PASSED
+✓ src/lib/authz.test.ts (17 tests) — PASSED
+✓ src/lib/audit.test.ts (6 tests) — PASSED
+✓ src/lib/auth.test.ts (7 tests) — PASSED
+✓ src/lib/chat/orchestrator.test.ts (9 tests) — PASSED
+✓ src/routes/settings.test.ts (14 tests) — PASSED
+✓ src/routes/models.test.ts (10 tests) — PASSED
+✓ src/routes/memory.test.ts (31 tests) — PASSED
+✓ src/routes/conversations.test.ts (27 tests) — PASSED
+✓ src/routes/skills.test.ts (24 tests) — PASSED
+✓ src/app.test.ts (7 tests) — PASSED
+
+=== REGRESSION VERDICT ===
+NO REGRESSIONS DETECTED.
+- BYOK provider resolution: no-BYOK falls back to FakeLLMProvider (PASS)
+- BYOK with encrypted settings: uses OpenAIProvider with decrypted key (PASS)
+- SSE error redaction: all sensitive keys/values properly redacted (PASS)
+- Global fallback: FakeLLMProvider used when no OPENAI_API_KEY set (PASS)

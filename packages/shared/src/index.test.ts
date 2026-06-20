@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import type { z } from "zod"
 import {
   API_V1,
+  advancedSettingsGetResponseSchema,
+  advancedSettingsPutInputSchema,
   chatMessageSchema,
   conversationIdSchema,
   conversationSchema,
@@ -9,6 +11,8 @@ import {
   healthResponseSchema,
   memoryEntrySchema,
   messageIdSchema,
+  modelItemSchema,
+  modelListResponseSchema,
   sendMessageInputSchema,
   skillSchema,
   userIdSchema,
@@ -201,6 +205,129 @@ describe("healthResponseSchema", () => {
   })
 })
 
+describe("modelItemSchema", () => {
+  it("parses valid model item with label", () => {
+    const result = modelItemSchema.parse({ id: "gpt-4", label: "GPT-4" })
+    expect(result.id).toBe("gpt-4")
+    expect(result.label).toBe("GPT-4")
+  })
+
+  it("parses valid model item without label", () => {
+    const result = modelItemSchema.parse({ id: "claude-3" })
+    expect(result.id).toBe("claude-3")
+    expect(result.label).toBeUndefined()
+  })
+
+  it("rejects empty id", () => {
+    expect(() => modelItemSchema.parse({ id: "" })).toThrow()
+  })
+})
+
+describe("modelListResponseSchema", () => {
+  it("parses valid model list", () => {
+    const result = modelListResponseSchema.parse({
+      models: [{ id: "gpt-4", label: "GPT-4" }, { id: "claude-3" }],
+    })
+    expect(result.models).toHaveLength(2)
+    expect(result.models[0]?.id).toBe("gpt-4")
+  })
+
+  it("rejects missing models array", () => {
+    expect(() => modelListResponseSchema.parse({})).toThrow()
+  })
+
+  it("accepts empty models array", () => {
+    const result = modelListResponseSchema.parse({ models: [] })
+    expect(result.models).toHaveLength(0)
+  })
+})
+
+describe("advancedSettingsGetResponseSchema", () => {
+  it("parses valid response with api key", () => {
+    const result = advancedSettingsGetResponseSchema.parse({
+      hasApiKey: true,
+      endpoint: "https://api.openai.com",
+      selectedModel: "gpt-4",
+    })
+    expect(result.hasApiKey).toBe(true)
+    expect(result.endpoint).toBe("https://api.openai.com")
+    expect(result.selectedModel).toBe("gpt-4")
+  })
+
+  it("parses valid response without api key", () => {
+    const result = advancedSettingsGetResponseSchema.parse({
+      hasApiKey: false,
+      endpoint: null,
+      selectedModel: null,
+    })
+    expect(result.hasApiKey).toBe(false)
+    expect(result.endpoint).toBeNull()
+  })
+
+  it("strips apiKey from response (must NEVER expose apiKey)", () => {
+    const result = advancedSettingsGetResponseSchema.parse({
+      hasApiKey: true,
+      apiKey: "sk-secret",
+      endpoint: null,
+      selectedModel: null,
+    })
+    expect(result.hasApiKey).toBe(true)
+    expect((result as Record<string, unknown>).apiKey).toBeUndefined()
+  })
+
+  it("rejects missing hasApiKey", () => {
+    expect(() =>
+      advancedSettingsGetResponseSchema.parse({
+        endpoint: null,
+        selectedModel: null,
+      }),
+    ).toThrow()
+  })
+})
+
+describe("advancedSettingsPutInputSchema", () => {
+  it("parses valid input with apiKey and endpoint", () => {
+    const result = advancedSettingsPutInputSchema.parse({
+      apiKey: "sk-test123",
+      endpoint: "https://api.openai.com/v1",
+    })
+    expect(result.apiKey).toBe("sk-test123")
+    expect(result.endpoint).toBe("https://api.openai.com/v1")
+  })
+
+  it("parses input with only apiKey", () => {
+    const result = advancedSettingsPutInputSchema.parse({ apiKey: "sk-test" })
+    expect(result.apiKey).toBe("sk-test")
+    expect(result.endpoint).toBeUndefined()
+  })
+
+  it("parses input with only endpoint", () => {
+    const result = advancedSettingsPutInputSchema.parse({
+      endpoint: "https://api.anthropic.com",
+    })
+    expect(result.apiKey).toBeUndefined()
+    expect(result.endpoint).toBe("https://api.anthropic.com")
+  })
+
+  it("rejects empty apiKey", () => {
+    expect(() => advancedSettingsPutInputSchema.parse({ apiKey: "" })).toThrow()
+  })
+
+  it("rejects invalid URL for endpoint", () => {
+    expect(() => advancedSettingsPutInputSchema.parse({ endpoint: "not-a-url" })).toThrow()
+  })
+
+  it("rejects URL without protocol", () => {
+    expect(() => advancedSettingsPutInputSchema.parse({ endpoint: "api.openai.com" })).toThrow()
+  })
+
+  it("accepts empty object (all fields optional)", () => {
+    const result = advancedSettingsPutInputSchema.parse({})
+    expect(result.apiKey).toBeUndefined()
+    expect(result.endpoint).toBeUndefined()
+  })
+})
+
 // ─── Branded ID type safety ─────────────────────────────────────────
 
 describe("branded ID schemas", () => {
@@ -334,7 +461,17 @@ describe("API_V1 routes", () => {
 
   it("has expected route keys", () => {
     const keys = entries.map(([k]) => k).sort()
-    expect(keys).toEqual(["AUTH", "CHAT", "CONVERSATIONS", "FILES", "HEALTH", "MEMORY", "SKILLS"])
+    expect(keys).toEqual([
+      "AUTH",
+      "CHAT",
+      "CONVERSATIONS",
+      "FILES",
+      "HEALTH",
+      "MEMORY",
+      "MODELS",
+      "SETTINGS",
+      "SKILLS",
+    ])
   })
 
   it("route values match expected paths", () => {
@@ -343,6 +480,8 @@ describe("API_V1 routes", () => {
     expect(API_V1.CONVERSATIONS).toBe("/api/v1/conversations")
     expect(API_V1.SKILLS).toBe("/api/v1/skills")
     expect(API_V1.MEMORY).toBe("/api/v1/memory")
+    expect(API_V1.SETTINGS).toBe("/api/v1/settings")
+    expect(API_V1.MODELS).toBe("/api/v1/models")
     expect(API_V1.HEALTH).toBe("/api/v1/health")
     expect(API_V1.FILES).toBe("/api/v1/files")
   })

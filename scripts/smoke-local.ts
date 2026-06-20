@@ -9,8 +9,8 @@
  *          (npm run dev should be started in another terminal)
  */
 
-import { existsSync, readFileSync } from "node:fs"
 import { spawnSync } from "node:child_process"
+import { existsSync, readFileSync } from "node:fs"
 
 interface Check {
   name: string
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   // ── 2. DB connectivity ───────────────────────────────────────────────
   try {
     const postgres = await import("postgres").then((m) => m.default)
-    const sql = postgres(process.env.DATABASE_URL ?? dbUrlMatch![1])
+    const sql = postgres(process.env.DATABASE_URL ?? dbUrlMatch?.[1])
     await sql`SELECT 1`
     await sql.end()
     log({ name: "Postgres reachable", ok: true })

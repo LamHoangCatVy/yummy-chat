@@ -11,7 +11,7 @@
     "test:auth": "vitest run src/lib/auth.test.ts",
     "test:authz": "vitest run src/lib/authz.test.ts",
     "test:conversations": "vitest run src/routes/conversations.test.ts",
-    "test:security": "vitest run src/lib/audit.test.ts src/lib/redact.test.ts",
+    "test:security": "vitest run src/lib/audit.test.ts src/lib/encryption.test.ts src/lib/redact.test.ts",
     "smoke:auth": "tsx src/smoke-auth.ts",
     "lint": "biome check src/"
   },

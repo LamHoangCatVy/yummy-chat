@@ -90,6 +90,42 @@ describe("redact", () => {
     expect(redact(true)).toBe(true)
   })
 
+  test("redacts apiKey (camelCase)", () => {
+    const input = { apiKey: "sk-proj-secret-key-12345" }
+    const result = redact(input)
+    expect(result.apiKey).toBe("[REDACTED]")
+  })
+
+  test("redacts encryptedApiKey", () => {
+    const input = { encryptedApiKey: "base64-encrypted-blob-here" }
+    const result = redact(input)
+    expect(result.encryptedApiKey).toBe("[REDACTED]")
+  })
+
+  test("redacts user_api_key (snake_case)", () => {
+    const input = { user_api_key: "sk-user-key-abcdef" }
+    const result = redact(input)
+    expect(result.user_api_key).toBe("[REDACTED]")
+  })
+
+  test("redacts nested object with BYOK-sensitive fields", () => {
+    const input = {
+      provider: "openai",
+      config: {
+        apiKey: "sk-proj-nested-key",
+        encryptedApiKey: "aes-gcm-base64-blob==",
+      },
+      headers: {
+        authorization: "Bearer token123",
+      },
+    }
+    const result = redact(input)
+    expect(result.provider).toBe("openai")
+    expect(result.config.apiKey).toBe("[REDACTED]")
+    expect(result.config.encryptedApiKey).toBe("[REDACTED]")
+    expect(result.headers.authorization).toBe("[REDACTED]")
+  })
+
   test("handles case-insensitive key matching", () => {
     const input = { Password: "secret", API_KEY: "key123", AuthToken: "tok" }
     const result = redact(input)

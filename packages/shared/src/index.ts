@@ -27,6 +27,8 @@ export type {
 export { API_V1 } from "./routes"
 
 export {
+  advancedSettingsGetResponseSchema,
+  advancedSettingsPutInputSchema,
   appendMessageInputSchema,
   chatMessageSchema,
   conversationIdSchema,
@@ -41,6 +43,8 @@ export {
   memoryListResponseSchema,
   memorySettingsSchema,
   messageIdSchema,
+  modelItemSchema,
+  modelListResponseSchema,
   paginationInputSchema,
   sendMessageInputSchema,
   sendMessageResponseSchema,
@@ -55,6 +59,8 @@ export {
 } from "./schemas"
 
 export type {
+  AdvancedSettingsGetResponse,
+  AdvancedSettingsPutInput,
   AppendMessageInput,
   ChatMessage,
   Conversation,
@@ -66,6 +72,8 @@ export type {
   MemoryEntry,
   MemoryListResponse,
   MemorySettings,
+  ModelItem,
+  ModelListResponse,
   PaginationInput,
   SendMessageInput,
   SendMessageResponse,

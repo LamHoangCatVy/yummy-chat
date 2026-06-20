@@ -1,5 +1,6 @@
 "use client"
 
+import { ModelSelector } from "@/components/models/model-selector"
 import { SkillSelector } from "@/components/skills/skill-selector"
 import { ArrowUp, Square } from "lucide-react"
 import { useCallback, useRef, useState } from "react"
@@ -13,6 +14,8 @@ interface ChatComposerProps {
   readonly conversationId: string | null
   readonly selectedSkillId: string | null
   readonly onSkillSelect: (skillId: string | null) => void
+  readonly selectedModel: string | null
+  readonly onModelSelect: (modelId: string) => void
 }
 
 /**
@@ -33,6 +36,8 @@ export function ChatComposer({
   conversationId,
   selectedSkillId,
   onSkillSelect,
+  selectedModel,
+  onModelSelect,
 }: ChatComposerProps) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -71,7 +76,7 @@ export function ChatComposer({
   return (
     <div className="bg-surface-primary px-spacing-4 pb-spacing-4 pt-spacing-2">
       <div className="mx-auto max-w-[48rem]">
-        <div className="flex flex-col rounded-[28px] border border-border-subtle bg-surface-primary px-spacing-4 py-spacing-3 transition-colors duration-[150ms] focus-within:border-border-hover">
+        <div className="flex flex-col rounded-[28px] border border-border-subtle bg-surface-primary px-spacing-4 py-spacing-3 transition-[border-color,box-shadow] duration-[150ms] focus-within:border-border-hover focus-within:shadow-[0_0_0_3px_var(--color-accent-ghost)]">
           <textarea
             ref={textareaRef}
             value={value}
@@ -83,15 +88,18 @@ export function ChatComposer({
             placeholder="Message yummy-chat"
             disabled={disabled || isStreaming}
             rows={1}
-            className="max-h-[200px] flex-1 resize-none bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary placeholder:text-text-tertiary focus:outline-none disabled:opacity-40"
+            className="max-h-[200px] flex-1 resize-none border-0 bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary shadow-none outline-none ring-0 placeholder:text-text-tertiary focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-40"
             aria-label="Message input"
           />
-          <div className="mt-spacing-2 flex items-center justify-between">
-            <SkillSelector
-              conversationId={conversationId}
-              selectedSkillId={selectedSkillId}
-              onSelect={onSkillSelect}
-            />
+          <div className="mt-spacing-2 flex items-center justify-between gap-spacing-2">
+            <div className="flex min-w-0 items-center gap-spacing-2">
+              <SkillSelector
+                conversationId={conversationId}
+                selectedSkillId={selectedSkillId}
+                onSelect={onSkillSelect}
+              />
+              <ModelSelector selectedModel={selectedModel} onSelect={onModelSelect} />
+            </div>
             {isStreaming ? (
               <button
                 type="button"

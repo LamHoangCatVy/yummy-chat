@@ -1,3 +1,6 @@
+import { eq } from "@yummy/db"
+import { db } from "@yummy/db"
+import { userApiSettings } from "@yummy/db/schema"
 import type { ApiErrorResponse, ConversationId, MessageId, SkillId, UserId } from "@yummy/shared"
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
@@ -5,12 +8,14 @@ import { z } from "zod"
 import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
 import type { Actor } from "../lib/authz.js"
 import { createOrchestrator } from "../lib/chat/orchestrator.js"
+import { decrypt } from "../lib/encryption.js"
 import { env } from "../lib/env.js"
 import { FakeLLMProvider } from "../lib/llm/fake-provider.js"
 import { OpenAIProvider } from "../lib/llm/openai-provider.js"
 import type { LLMProvider } from "../lib/llm/provider.js"
 import type { UsageMetadata } from "../lib/llm/provider.js"
 import { extractXlsxJson, generateXlsxFile } from "../lib/llm/xlsx-generator.js"
+import { redactString } from "../lib/redact.js"
 import { conversationRepository, messageRepository, skillRepository } from "../lib/repositories.js"
 import { requireAuth } from "../middleware/auth-guard.js"
 import type { RequestIdVariables } from "../middleware/request-id.js"
@@ -48,13 +53,35 @@ const chatStreamInputSchema = z.object({
   memoryEnabled: z.boolean().optional().default(false),
 })
 
-// ── Provider singleton (swap for real provider later) ───────────────────────
+// ── Provider resolution (per-request, request-scoped) ──────────────────────
 
 function getProvider(): LLMProvider {
   if (env.openaiApiKey) {
     return new OpenAIProvider(env.openaiApiKey, env.openaiModel)
   }
+  if (process.env.FAKE_PROVIDER_ERROR) {
+    return new FakeLLMProvider({
+      errorAfterChunks: 0,
+      errorMessage: process.env.FAKE_PROVIDER_ERROR,
+    })
+  }
   return new FakeLLMProvider()
+}
+
+async function resolveProviderForUser(userId: string): Promise<LLMProvider> {
+  const rows = await db.select().from(userApiSettings).where(eq(userApiSettings.userId, userId))
+  const row = rows[0]
+
+  if (row?.encryptedApiKey && row?.endpoint) {
+    const decryptedKey = decrypt(row.encryptedApiKey, env.userApiKeyEncryptionSecret)
+    return new OpenAIProvider(
+      decryptedKey,
+      row.selectedModel || env.openaiModel,
+      row.endpoint || undefined,
+    )
+  }
+
+  return getProvider()
 }
 
 // ── POST /stream ────────────────────────────────────────────────────────────
@@ -143,8 +170,19 @@ chatRouter.post("/stream", async (c) => {
     abortController.abort()
   })
 
+  const user = c.get("user")
+  if (!user) {
+    return c.json(
+      {
+        success: false,
+        error: { type: "UNAUTHORIZED", message: "Not authenticated", statusCode: 401 },
+      },
+      401,
+    )
+  }
+
   // Create orchestrator and run
-  const provider = getProvider()
+  const provider = await resolveProviderForUser(user.id)
   const orchestrator = createOrchestrator({ provider })
 
   let assistantMsgId: MessageId | null = null
@@ -158,6 +196,7 @@ chatRouter.post("/stream", async (c) => {
       {
         conversationId: conversationId as ConversationId,
         userMessage: content,
+        userMessageId: userMsgId,
         model,
         ...(skillId ? { skillId: skillId as SkillId } : {}),
         memoryEnabled,
@@ -224,7 +263,7 @@ chatRouter.post("/stream", async (c) => {
               await stream.writeSSE({
                 event: "error",
                 data: JSON.stringify({
-                  error: chunk.error,
+                  error: redactString(chunk.error),
                   code: chunk.code,
                 }),
               })
@@ -236,7 +275,7 @@ chatRouter.post("/stream", async (c) => {
         const errorMsg = err instanceof Error ? err.message : "Unknown streaming error"
         await stream.writeSSE({
           event: "error",
-          data: JSON.stringify({ error: errorMsg, code: "STREAM_ERROR" }),
+          data: JSON.stringify({ error: redactString(errorMsg), code: "STREAM_ERROR" }),
         })
       } finally {
         // Persist the completed assistant message
@@ -279,7 +318,7 @@ chatRouter.post("/stream", async (c) => {
               fileErr instanceof Error ? fileErr.message : "File generation failed"
             await stream.writeSSE({
               event: "error",
-              data: JSON.stringify({ error: fileErrorMsg, code: "FILE_GEN_ERROR" }),
+              data: JSON.stringify({ error: redactString(fileErrorMsg), code: "FILE_GEN_ERROR" }),
             })
           }
         }
@@ -307,7 +346,7 @@ chatRouter.post("/stream", async (c) => {
       success: false,
       error: {
         type: "INTERNAL_ERROR",
-        message: errorMsg,
+        message: redactString(errorMsg),
         statusCode: 500,
       },
       meta: meta(c),

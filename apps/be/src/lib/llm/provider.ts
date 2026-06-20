@@ -20,6 +20,21 @@ export interface StreamRequest {
   readonly systemPrompt?: string
 }
 
+// ── Complete (non-streaming) request / response ─────────────────────────────
+
+export interface CompleteRequest {
+  readonly messages: readonly ProviderMessage[]
+  readonly model: string
+  readonly systemPrompt?: string
+  /** Maximum tokens for the completion. */
+  readonly maxTokens?: number
+}
+
+export interface CompleteResponse {
+  readonly content: string
+  readonly usage: UsageMetadata
+}
+
 // ── Stream chunks ───────────────────────────────────────────────────────────
 
 export type TextDeltaChunk = {
@@ -60,4 +75,11 @@ export interface LLMProvider {
    * producing chunks as soon as possible.
    */
   stream(request: StreamRequest, signal?: AbortSignal): AsyncIterable<StreamChunk>
+
+  /**
+   * Non-streaming completion — sends the full prompt and returns the
+   * complete response in a single call.  Useful for short generation tasks
+   * like title summarisation where streaming overhead is unnecessary.
+   */
+  complete(request: CompleteRequest, signal?: AbortSignal): Promise<CompleteResponse>
 }

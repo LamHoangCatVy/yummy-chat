@@ -6,7 +6,14 @@
  * error-handling paths can be exercised without a real API key.
  */
 
-import type { LLMProvider, StreamChunk, StreamRequest, UsageMetadata } from "./provider.js"
+import type {
+  CompleteRequest,
+  CompleteResponse,
+  LLMProvider,
+  StreamChunk,
+  StreamRequest,
+  UsageMetadata,
+} from "./provider.js"
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
@@ -86,6 +93,16 @@ export class FakeLLMProvider implements LLMProvider {
       type: "finish",
       finishReason: "stop",
       usage: this.computeUsage(emittedTextChunks),
+    }
+  }
+
+  async complete(request: CompleteRequest, _signal?: AbortSignal): Promise<CompleteResponse> {
+    const userMsg = request.messages.find((m) => m.role === "user")
+    const words = userMsg?.content.split(/\s+/).slice(0, 6).join(" ") ?? "Fake conversation"
+    const title = `${words}...`
+    return {
+      content: title,
+      usage: this.computeUsage(Math.ceil(title.length / 4)),
     }
   }
 

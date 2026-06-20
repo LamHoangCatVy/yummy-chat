@@ -1,4 +1,4 @@
-import { and, desc, eq, lt } from "@yummy/db"
+import { and, asc, desc, eq, gt, lt } from "@yummy/db"
 import { db } from "@yummy/db"
 import {
   conversation,
@@ -6,6 +6,7 @@ import {
   memoryEntry,
   message,
   skill,
+  userApiSettings,
   userMemorySettings,
 } from "@yummy/db/schema"
 import type { ConversationId, MemoryId, MessageId, SkillId } from "@yummy/shared"
@@ -17,6 +18,7 @@ export type ConversationRow = typeof conversation.$inferSelect
 export type MessageRow = typeof message.$inferSelect
 export type MemoryEntryRow = typeof memoryEntry.$inferSelect
 export type SkillRow = typeof skill.$inferSelect
+export type UserApiSettingsRow = typeof userApiSettings.$inferSelect
 
 // ── Paginated result shape ──────────────────────────────────────────────────
 
@@ -104,13 +106,13 @@ export function messageRepository(conversationId: ConversationId) {
     listPaginated(limit: number, cursor?: string): Promise<PaginatedResult<MessageRow>> {
       const conditions = [eq(message.conversationId, conversationId)]
       if (cursor) {
-        conditions.push(lt(message.id, cursor))
+        conditions.push(gt(message.createdAt, new Date(cursor)))
       }
       return db
         .select()
         .from(message)
         .where(and(...conditions))
-        .orderBy(desc(message.id))
+        .orderBy(asc(message.createdAt))
         .limit(limit + 1)
         .then((rows) => {
           const hasMore = rows.length > limit
@@ -118,7 +120,7 @@ export function messageRepository(conversationId: ConversationId) {
           const lastItem = data[data.length - 1]
           return {
             data,
-            nextCursor: hasMore && lastItem ? lastItem.id : null,
+            nextCursor: hasMore && lastItem ? lastItem.createdAt.toISOString() : null,
           }
         })
     },
@@ -352,6 +354,53 @@ export function skillRepository(actor: Actor) {
       return db
         .delete(conversationSkillSnapshot)
         .where(eq(conversationSkillSnapshot.conversationId, conversationId))
+        .returning()
+        .then((rows) => rows.length > 0)
+    },
+  }
+}
+
+// ── API settings repository (owner-scoped) ──────────────────────────────────
+
+export function apiSettingsRepository(actor: Actor) {
+  return {
+    get(): Promise<UserApiSettingsRow | undefined> {
+      return db
+        .select()
+        .from(userApiSettings)
+        .where(eq(userApiSettings.userId, actor.userId))
+        .then((rows) => rows[0])
+    },
+
+    upsert(data: {
+      encryptedApiKey?: string | null
+      endpoint?: string | null
+      selectedModel?: string | null
+    }): Promise<UserApiSettingsRow | undefined> {
+      const setData: Record<string, unknown> = { updatedAt: new Date() }
+      if (data.encryptedApiKey !== undefined) setData.encryptedApiKey = data.encryptedApiKey
+      if (data.endpoint !== undefined) setData.endpoint = data.endpoint
+      if (data.selectedModel !== undefined) setData.selectedModel = data.selectedModel
+      return db
+        .insert(userApiSettings)
+        .values({
+          userId: actor.userId,
+          encryptedApiKey: data.encryptedApiKey ?? null,
+          endpoint: data.endpoint ?? null,
+          selectedModel: data.selectedModel ?? null,
+        })
+        .onConflictDoUpdate({
+          target: userApiSettings.userId,
+          set: setData,
+        })
+        .returning()
+        .then((rows) => rows[0])
+    },
+
+    delete(): Promise<boolean> {
+      return db
+        .delete(userApiSettings)
+        .where(eq(userApiSettings.userId, actor.userId))
         .returning()
         .then((rows) => rows.length > 0)
     },

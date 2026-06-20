@@ -24,6 +24,9 @@ export const env = {
   get llmProviderApiKey(): string | undefined {
     return process.env.LLM_PROVIDER_API_KEY
   },
+  get userApiKeyEncryptionSecret(): string {
+    return requireEnv("USER_API_KEY_ENCRYPTION_SECRET")
+  },
   get openaiApiKey(): string | undefined {
     return process.env.OPENAI_API_KEY
   },

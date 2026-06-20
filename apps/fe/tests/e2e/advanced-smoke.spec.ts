@@ -111,7 +111,7 @@ test.describe("Advanced smoke: skills + memory", () => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
     const page1 = await context1.newPage()
-    const page2 = await context2.newPage()
+    const _page2 = await context2.newPage()
 
     // User 1 logs in
     await page1.goto("/login")
@@ -163,5 +163,76 @@ test.describe("Advanced smoke: skills + memory", () => {
 
     // Should be redirected to login
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
+  })
+})
+
+test.describe("Advanced smoke: BYOK flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login")
+    await page.getByLabel("Email").fill(TEST_USER.email)
+    await page.getByLabel("Password").fill(TEST_USER.password)
+    await page.getByRole("button", { name: /sign in/i }).click()
+    await expect(page).toHaveURL(/\/chat/, { timeout: 15_000 })
+  })
+
+  test("BYOK advanced settings and model selection flow", async ({ page }) => {
+    // ── Step 1: Navigate to advanced settings ──────────────────────────────
+    await page.goto("/settings/advanced")
+    await expect(page).toHaveURL(/\/settings\/advanced/, { timeout: 10_000 })
+    await expect(page.getByRole("heading", { name: /advanced/i })).toBeVisible({ timeout: 10_000 })
+
+    // ── Step 2: Verify key form elements are present ────────────────────────
+    const apiKeyInput = page.locator("#advanced-api-key")
+    const endpointInput = page.locator("#advanced-endpoint")
+    await expect(apiKeyInput).toBeVisible({ timeout: 5_000 })
+    await expect(endpointInput).toBeVisible({ timeout: 5_000 })
+
+    // ── Step 3: Fill BYOK settings ─────────────────────────────────────────
+    await apiKeyInput.fill("sk-test-byok-e2e-key-12345")
+    await endpointInput.clear()
+    await endpointInput.fill("https://api.openai.com/v1")
+
+    // ── Step 4: Save ───────────────────────────────────────────────────────
+    await page.getByRole("button", { name: /^save$/i }).click()
+
+    // ── Step 5: Verify success message ─────────────────────────────────────
+    await expect(page.getByText("Settings saved")).toBeVisible({ timeout: 10_000 })
+
+    // ── Step 6: Navigate to chat ───────────────────────────────────────────
+    await page.goto("/chat")
+    await expect(page).toHaveURL(/\/chat/, { timeout: 10_000 })
+
+    // ── Step 7: Verify model dropdown is visible in composer ────────────────
+    const modelButton = page.getByRole("combobox", { name: "Model" })
+    await expect(modelButton).toBeVisible({ timeout: 10_000 })
+
+    // ── Step 8: Open model dropdown and verify it shows content ─────────────
+    await modelButton.click()
+    await expect(page.getByRole("listbox", { name: "Available models" })).toBeVisible({
+      timeout: 5_000,
+    })
+
+    // Verify listbox has content — models, or "No models available", or loading
+    const listbox = page.getByRole("listbox", { name: "Available models" })
+    const optionCount = await listbox.getByRole("option").count()
+    const hasNoModels = await listbox
+      .getByText("No models available")
+      .isVisible()
+      .catch(() => false)
+
+    // Should have options OR show "No models available" — both are valid states
+    expect(optionCount > 0 || hasNoModels).toBe(true)
+
+    // ── Step 9: Send a message with model selected ──────────────────────────
+    // Close dropdown by clicking outside
+    await page.locator("body").click({ position: { x: 0, y: 0 } })
+
+    const messageInput = page.getByRole("textbox", { name: /message/i })
+    await expect(messageInput).toBeVisible({ timeout: 10_000 })
+    await messageInput.fill("Hello from BYOK test")
+    await messageInput.press("Enter")
+
+    // Verify the message was sent
+    await expect(page.getByText("Hello from BYOK test")).toBeVisible({ timeout: 10_000 })
   })
 })

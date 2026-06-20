@@ -73,6 +73,15 @@ function ChatSidebarInner({
     [setActiveId],
   )
 
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      if (activeId === id) {
+        setActiveId(null)
+      }
+    },
+    [activeId, setActiveId],
+  )
+
   const handleSignOut = useCallback(async () => {
     try {
       await signOut()
@@ -91,6 +100,7 @@ function ChatSidebarInner({
             activeId={activeId}
             onSelect={handleSelectConversation}
             onNewConversation={handleNewConversation}
+            onDelete={handleDeleteConversation}
           />
         </div>
         <UserFooter userName={userName} onSignOut={handleSignOut} />
@@ -117,6 +127,7 @@ function ChatSidebarInner({
                 activeId={activeId}
                 onSelect={handleSelectConversation}
                 onNewConversation={handleNewConversation}
+                onDelete={handleDeleteConversation}
                 isMobile
                 onCloseMobile={() => setIsMobileMenuOpen(false)}
               />
@@ -160,7 +171,7 @@ function UserFooter({
   return (
     <div className="shrink-0 border-t border-border-subtle px-spacing-2 py-spacing-2">
       <div className="flex items-center justify-between rounded-radius-md px-spacing-2 py-spacing-1">
-        <span className="truncate text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
+        <span className="min-w-0 truncate text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
           {userName}
         </span>
         <div className="flex shrink-0 items-center gap-spacing-half">

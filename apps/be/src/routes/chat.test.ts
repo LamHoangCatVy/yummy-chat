@@ -1,10 +1,19 @@
+import { user, userApiSettings } from "@yummy/db/schema"
+import { eq } from "drizzle-orm"
+import { drizzle } from "drizzle-orm/postgres-js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { encrypt } from "../lib/encryption"
+import { redact } from "../lib/redact"
 import { createTestDatabase } from "../test/db"
 
 const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-chat-stream-tests"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
+process.env.USER_API_KEY_ENCRYPTION_SECRET = "test-byok-encryption-secret"
+
+// Create a local drizzle instance pointing at the test DB (avoids eager-loading @yummy/db client)
+const testDb = drizzle(testDatabase.sql, { schema: { user, userApiSettings } })
 
 const { createApp } = await import("../app")
 
@@ -252,6 +261,153 @@ describe("chat streaming API", () => {
       expect(userMsgs.some((m: { content: string }) => m.content === "persist this message")).toBe(
         true,
       )
+    })
+  })
+
+  describe("BYOK provider resolution", () => {
+    it("resolves to FakeLLMProvider when user has no BYOK settings", async () => {
+      // No OPENAI_API_KEY set, no user_api_settings row → FakeLLMProvider fallback
+      const app = createApp()
+      const res = await app.request("/api/v1/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookies },
+        body: JSON.stringify({
+          conversationId,
+          content: "test no BYOK",
+          model: "fake-provider",
+        }),
+      })
+
+      expect(res.status).toBe(200)
+      const events = await parseSSEStream(res, 10000)
+      const textEvents = events.filter((e) => e.event === "text")
+      const fullText = textEvents.map((e) => JSON.parse(e.data).text).join("")
+      // Default fake provider output confirms FakeLLMProvider was used
+      expect(fullText).toBe("Hello from the fake LLM provider!")
+    })
+
+    it("uses BYOK settings when user has them configured", async () => {
+      const app = createApp()
+
+      // Get the test user's ID from DB
+      const users = await testDb.select().from(user).where(eq(user.email, testUser.email))
+      const userId = users[0]?.id
+      expect(userId).toBeDefined()
+
+      // Encrypt a dummy API key and insert BYOK settings
+      const encryptionSecret = process.env.USER_API_KEY_ENCRYPTION_SECRET
+      if (!encryptionSecret) throw new Error("USER_API_KEY_ENCRYPTION_SECRET not set")
+      const dummyKey = "sk-byok-dummy-key-for-testing-12345"
+      const encryptedKey = encrypt(dummyKey, encryptionSecret)
+      const customEndpoint = "https://api.openai.com/v1"
+      const selectedModel = "gpt-4o-byok"
+
+      const uid = userId
+      if (!uid) throw new Error("Test user not found")
+
+      await testDb.insert(userApiSettings).values({
+        userId: uid,
+        encryptedApiKey: encryptedKey,
+        endpoint: customEndpoint,
+        selectedModel: selectedModel,
+        id: crypto.randomUUID(),
+      })
+
+      // Make a stream request — BYOK path will create OpenAIProvider with the dummy
+      // key, which will fail against real OpenAI API, producing an error event
+      const res = await app.request("/api/v1/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookies },
+        body: JSON.stringify({
+          conversationId,
+          content: "test BYOK",
+          model: "gpt-4o-byok",
+        }),
+      })
+
+      expect(res.status).toBe(200)
+      expect(res.headers.get("content-type")).toContain("text/event-stream")
+
+      const events = await parseSSEStream(res, 15000)
+      const textEvents = events.filter((e) => e.event === "text")
+      const errorEvents = events.filter((e) => e.event === "error")
+
+      // BYOK path should NOT produce fake provider text (no "Hello from")
+      if (textEvents.length > 0) {
+        const fullText = textEvents.map((e) => JSON.parse(e.data).text).join("")
+        expect(fullText).not.toContain("Hello from the fake LLM")
+      }
+
+      // An error event from OpenAI (invalid key) confirms BYOK provider was used
+      // instead of falling back to FakeLLMProvider
+      expect(errorEvents.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  describe("SSE error redaction", () => {
+    it("redact() redacts sensitive object keys", () => {
+      const result = redact({ apiKey: "sk-test-secret-key-for-redaction-12345" })
+      expect(result).toEqual({ apiKey: "[REDACTED]" })
+    })
+
+    it("redact() redacts authorization values", () => {
+      const result = redact({ authorization: "Bearer sk-test-secret-token-value" })
+      expect(result).toEqual({ authorization: "[REDACTED]" })
+    })
+
+    it("redact() catches standalone sk- keys via secret pattern", () => {
+      const result = redact({ token: "sk-test-secret-key-long-enough-for-match" })
+      expect(result).toEqual({ token: "[REDACTED]" })
+    })
+
+    it("SSE error events from provider are redacted", async () => {
+      const app = createApp()
+      const users = await testDb.select().from(user).where(eq(user.email, testUser.email))
+      const userId = users[0]?.id
+      if (userId) {
+        await testDb.delete(userApiSettings).where(eq(userApiSettings.userId, userId))
+      }
+
+      const prevFakeError = process.env.FAKE_PROVIDER_ERROR
+      process.env.FAKE_PROVIDER_ERROR =
+        "Error 401: Invalid API key sk-test-secret-foobar1234567890. Authorization: Bearer sk-test-secret-abcdef"
+      const prevOpenaiKey = process.env.OPENAI_API_KEY
+      // biome-ignore lint/performance/noDelete: need to actually unset (not set to truthy string "undefined")
+      delete process.env.OPENAI_API_KEY
+      try {
+        const res = await app.request("/api/v1/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookies },
+          body: JSON.stringify({
+            conversationId,
+            content: "trigger error for redaction",
+            model: "fake-model",
+          }),
+        })
+
+        expect(res.status).toBe(200)
+        expect(res.headers.get("content-type")).toContain("text/event-stream")
+
+        const events = await parseSSEStream(res, 15000)
+        const errorEvents = events.filter((e) => e.event === "error")
+
+        expect(errorEvents.length).toBeGreaterThanOrEqual(1)
+
+        for (const evt of errorEvents) {
+          const data = JSON.parse(evt.data)
+          const errorStr = JSON.stringify(data)
+          expect(errorStr).not.toContain("sk-test-secret-foobar1234567890")
+          expect(errorStr).not.toContain("sk-test-secret-abcdef")
+        }
+      } finally {
+        process.env.FAKE_PROVIDER_ERROR = undefined
+        if (prevFakeError !== undefined) {
+          process.env.FAKE_PROVIDER_ERROR = prevFakeError
+        }
+        if (prevOpenaiKey !== undefined) {
+          process.env.OPENAI_API_KEY = prevOpenaiKey
+        }
+      }
     })
   })
 })

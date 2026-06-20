@@ -39,6 +39,8 @@ export interface OrchestrateRequest {
   readonly model: string
   readonly skillId?: SkillId
   readonly memoryEnabled?: boolean
+  /** ID of the user message already saved to DB (used to exclude it from history). */
+  readonly userMessageId?: string
 }
 
 export interface OrchestrateResult {
@@ -75,7 +77,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       // 1. Load conversation history
       const msgRepo = messageRepository(request.conversationId)
       const historyResult = await msgRepo.listPaginated(100)
-      const allHistory = [...historyResult.data].reverse() // oldest first
+      const allHistory = [...historyResult.data]
+        .filter((m) => m.id !== request.userMessageId)
+        .reverse() // oldest first
 
       // 2. Load skill if specified
       let skillPrompt: string | null = null
@@ -214,30 +218,27 @@ function buildMessagesWithBudget(
   included: number
   truncated: number
 } {
-  const availableBudget = budget - estimateTokens(systemPrompt) - SYSTEM_OVERHEAD_TOKENS
+  const userMsgTokens = estimateTokens(newUserMessage)
+  const availableBudget =
+    budget - estimateTokens(systemPrompt) - SYSTEM_OVERHEAD_TOKENS - userMsgTokens
 
-  // Start from the most recent history and work backwards
   const messages: ProviderMessage[] = []
   let usedTokens = 0
   let included = 0
 
-  // Add user message first (always included)
-  const userMsgTokens = estimateTokens(newUserMessage)
-  messages.push({ role: "user", content: newUserMessage })
-  usedTokens += userMsgTokens
-  included = 0 // history messages included
-
-  // Add history from most recent to oldest, within budget
-  const reversedHistory = [...history].reverse()
-  for (const msg of reversedHistory) {
+  // Add history from oldest to newest (history is already oldest-first), within budget
+  for (const msg of history) {
     const msgTokens = estimateTokens(msg.content)
     if (usedTokens + msgTokens > availableBudget) {
       break
     }
-    messages.splice(1, 0, { role: msg.role, content: msg.content })
+    messages.push({ role: msg.role, content: msg.content })
     usedTokens += msgTokens
     included++
   }
+
+  // Add new user message at the END (always included)
+  messages.push({ role: "user", content: newUserMessage })
 
   const truncated = history.length - included
 

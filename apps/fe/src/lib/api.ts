@@ -1,5 +1,7 @@
 import { API_V1 } from "@yummy/shared"
 import type {
+  AdvancedSettingsGetResponse,
+  AdvancedSettingsPutInput,
   ApiErrorResponse,
   ApiResponse,
   Conversation,
@@ -11,6 +13,7 @@ import type {
   MemoryEntry,
   MemoryListResponse,
   MemorySettings,
+  ModelListResponse,
   SendMessageInput,
   SendMessageResponse,
   Skill,
@@ -19,17 +22,20 @@ import type {
   UpdateSkillInput,
 } from "@yummy/shared"
 import {
+  advancedSettingsGetResponseSchema,
+  advancedSettingsPutInputSchema,
   conversationListResponseSchema,
   conversationSchema,
   healthResponseSchema,
   memoryEntrySchema,
   memoryListResponseSchema,
   memorySettingsSchema,
+  modelListResponseSchema,
   sendMessageResponseSchema,
   skillListResponseSchema,
   skillSchema,
 } from "@yummy/shared"
-import type { z } from "zod"
+import { z } from "zod"
 
 interface FetchOptions<T extends z.ZodType> extends Omit<RequestInit, "body"> {
   readonly body?: unknown
@@ -204,8 +210,75 @@ export function updateMemorySettings(input: MemorySettings) {
   })
 }
 
-export { ApiError }
+export function getAdvancedSettings(): Promise<AdvancedSettingsGetResponse> {
+  return fetchApi(`${API_V1.SETTINGS}/advanced`, { schema: advancedSettingsGetResponseSchema })
+}
+
+export function updateAdvancedSettings(
+  input: AdvancedSettingsPutInput,
+): Promise<AdvancedSettingsGetResponse> {
+  return fetchApi(`${API_V1.SETTINGS}/advanced`, {
+    method: "PUT",
+    body: advancedSettingsPutInputSchema.parse(input) satisfies AdvancedSettingsPutInput,
+    schema: advancedSettingsGetResponseSchema,
+  })
+}
+
+export function fetchModels(): Promise<ModelListResponse> {
+  return fetchApi(API_V1.MODELS, { schema: modelListResponseSchema })
+}
+
+export interface MessageListItem {
+  readonly id: string
+  readonly role: "system" | "user" | "assistant"
+  readonly content: string
+  readonly createdAt: string
+}
+
+const messageListItemSchema = z.object({
+  id: z.string(),
+  role: z.enum(["system", "user", "assistant"]),
+  content: z.string(),
+  createdAt: z.string(),
+})
+
+const messageListResponseSchema = z.object({
+  data: z.array(messageListItemSchema),
+  nextCursor: z.string().nullable(),
+})
+
+export function listMessages(conversationId: string): Promise<{
+  data: readonly MessageListItem[]
+  nextCursor: string | null
+}> {
+  return fetchApi(`${API_V1.CONVERSATIONS}/${conversationId}/messages`, {
+    schema: messageListResponseSchema,
+  })
+}
+
+const generateTitleResponseSchema = z.object({
+  title: z.string(),
+})
+
+export function generateConversationTitle(
+  conversationId: string,
+  model: string,
+): Promise<{ title: string }> {
+  return fetchApi(`${API_V1.CONVERSATIONS}/${conversationId}/generate-title`, {
+    method: "POST",
+    body: { model },
+    schema: generateTitleResponseSchema,
+  })
+}
+
+export function deleteConversation(id: string) {
+  return fetchApi(`${API_V1.CONVERSATIONS}/${id}`, { method: "DELETE" })
+}
+
+export { ApiError, fetchApi }
 export type {
+  AdvancedSettingsGetResponse,
+  AdvancedSettingsPutInput,
   HealthResponse,
   ConversationListResponse,
   Conversation,
@@ -220,4 +293,5 @@ export type {
   CreateMemoryInput,
   UpdateMemoryInput,
   MemorySettings,
+  ModelListResponse,
 }

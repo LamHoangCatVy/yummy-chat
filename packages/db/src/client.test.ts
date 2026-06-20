@@ -50,6 +50,7 @@ describe("@yummy/db", () => {
     expect(names.includes("conversation_skill_snapshot")).toBe(true)
     expect(names.includes("memory_entry")).toBe(true)
     expect(names.includes("user_memory_settings")).toBe(true)
+    expect(names.includes("user_api_settings")).toBe(true)
     expect(names.includes("audit_event")).toBe(true)
     expect(names.includes("usage_record")).toBe(true)
   })
@@ -72,6 +73,38 @@ describe("@yummy/db", () => {
       await sql`
         INSERT INTO message (id, conversation_id, role, content)
         VALUES ('m1', 'nonexistent', 'user', 'hello')
+      `
+    } catch {
+      threw = true
+    }
+    expect(threw).toBe(true)
+  })
+
+  it("rejects orphan user_api_settings (FK constraint)", async () => {
+    let threw = false
+    try {
+      await sql`
+        INSERT INTO user_api_settings (id, user_id, encrypted_api_key)
+        VALUES ('as1', 'nonexistent', 'encrypted-key-123')
+      `
+    } catch {
+      threw = true
+    }
+    expect(threw).toBe(true)
+  })
+
+  it("rejects duplicate user_id in user_api_settings (unique constraint)", async () => {
+    await sql`INSERT INTO "user" (id, name, email) VALUES ('uapiset', 'API User', 'apiuser@x.com')`
+    await sql`
+      INSERT INTO user_api_settings (id, user_id, endpoint)
+      VALUES ('as2', 'uapiset', 'https://api.example.com')
+    `
+
+    let threw = false
+    try {
+      await sql`
+        INSERT INTO user_api_settings (id, user_id, endpoint)
+        VALUES ('as3', 'uapiset', 'https://api2.example.com')
       `
     } catch {
       threw = true

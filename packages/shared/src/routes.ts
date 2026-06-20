@@ -4,6 +4,8 @@ export const API_V1 = {
   CONVERSATIONS: "/api/v1/conversations",
   SKILLS: "/api/v1/skills",
   MEMORY: "/api/v1/memory",
+  SETTINGS: "/api/v1/settings",
+  MODELS: "/api/v1/models",
   HEALTH: "/api/v1/health",
   FILES: "/api/v1/files",
 } as const
