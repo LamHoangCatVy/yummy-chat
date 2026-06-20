@@ -88,7 +88,7 @@ export function ChatComposer({
             placeholder="Message yummy-chat"
             disabled={disabled || isStreaming}
             rows={1}
-            className="max-h-[200px] flex-1 resize-none border-0 bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary shadow-none outline-none ring-0 placeholder:text-text-tertiary focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-40"
+            className="max-h-[200px] flex-1 resize-none appearance-none !border-0 bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary !shadow-none !outline-none !ring-0 placeholder:text-text-tertiary focus:!border-0 focus:!shadow-none focus:!outline-none focus:!ring-0 focus-visible:!border-0 focus-visible:!shadow-none focus-visible:!outline-none focus-visible:!ring-0 disabled:opacity-40"
             aria-label="Message input"
           />
           <div className="mt-spacing-2 flex items-center justify-between gap-spacing-2">
