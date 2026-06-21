@@ -1,7 +1,7 @@
 "use client"
 
-import { createConversation, generateConversationTitle } from "@/lib/api"
 import { useConversation } from "@/components/sidebar/conversation-context"
+import { createConversation, generateConversationTitle } from "@/lib/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ChatComposer } from "./chat-composer"
 import { ChatTranscript } from "./chat-transcript"
@@ -66,7 +66,7 @@ export function ChatContainer({ userName }: ChatContainerProps) {
           console.error("[chat] title generation failed:", err)
         })
     }
-  }, [status, messages.length, conversationId, selectedModel, triggerRefresh])
+  }, [status, messages.length, messages[0]?.role, conversationId, selectedModel, triggerRefresh])
 
   const handleSend = useCallback(
     async (content: string) => {

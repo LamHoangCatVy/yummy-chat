@@ -22,6 +22,7 @@
     "db:reset": "npx tsx scripts/db-reset.ts",
     "smoke:auth": "npm run smoke:auth -w @yummy/be",
     "smoke:core": "npm run smoke:core -w @yummy/fe",
+    "smoke:pptx": "npm run smoke:pptx -w @yummy/fe",
     "smoke:local": "npx tsx scripts/smoke-local.ts"
   },
   "devDependencies": {

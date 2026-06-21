@@ -20,6 +20,8 @@ import type {
 export interface FakeProviderOptions {
   /** Deterministic chunks to emit.  Defaults to a 5-word sentence. */
   readonly chunks?: readonly string[]
+  /** JSON string of a string array, e.g. '["Hello","```pptx-json\\n...","```"]'. Parsed at constructor time. */
+  readonly chunksJson?: string
   /** Delay in ms between chunks.  Defaults to 50. */
   readonly chunkDelayMs?: number
   /** If set, throw after emitting this many text chunks. */
@@ -41,7 +43,12 @@ export class FakeLLMProvider implements LLMProvider {
   private readonly errorMessage: string
 
   constructor(options: FakeProviderOptions = {}) {
-    this.chunks = options.chunks ?? DEFAULT_CHUNKS
+    if (options.chunksJson) {
+      const parsed = JSON.parse(options.chunksJson) as string[]
+      this.chunks = parsed
+    } else {
+      this.chunks = options.chunks ?? DEFAULT_CHUNKS
+    }
     this.chunkDelayMs = options.chunkDelayMs ?? DEFAULT_DELAY_MS
     this.errorAfterChunks = options.errorAfterChunks
     this.errorMessage = options.errorMessage ?? "Simulated provider error"

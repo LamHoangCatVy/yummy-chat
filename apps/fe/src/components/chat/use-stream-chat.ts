@@ -3,6 +3,7 @@
 import { listMessages } from "@/lib/api"
 import { API_V1 } from "@yummy/shared"
 import { useCallback, useRef, useState } from "react"
+import { mapMessageListItemToChatMessage } from "./chat-transcript-helpers"
 import type { ChatMessage, FileAttachment, StreamStatus } from "./types"
 
 interface UseStreamChatOptions {
@@ -71,13 +72,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
 
     try {
       const result = await listMessages(conversationId)
-      const loaded: ChatMessage[] = result.data.map((m) => ({
-        id: m.id,
-        role: m.role === "system" ? "assistant" : (m.role as "user" | "assistant"),
-        content: m.content,
-        isStreaming: false,
-        createdAt: m.createdAt,
-      }))
+      const loaded: ChatMessage[] = result.data.map(mapMessageListItemToChatMessage)
       setMessages(loaded)
       firstExchangeRef.current = loaded.length === 0
     } catch {

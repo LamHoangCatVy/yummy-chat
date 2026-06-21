@@ -12,11 +12,17 @@ import { decrypt } from "../lib/encryption.js"
 import { env } from "../lib/env.js"
 import { FakeLLMProvider } from "../lib/llm/fake-provider.js"
 import { OpenAIProvider } from "../lib/llm/openai-provider.js"
+import { extractPptxJson, generatePptxBuffer } from "../lib/llm/pptx-generator.js"
 import type { LLMProvider } from "../lib/llm/provider.js"
 import type { UsageMetadata } from "../lib/llm/provider.js"
-import { extractXlsxJson, generateXlsxFile } from "../lib/llm/xlsx-generator.js"
+import { extractXlsxJson, generateXlsxBuffer } from "../lib/llm/xlsx-generator.js"
 import { redactString } from "../lib/redact.js"
-import { conversationRepository, messageRepository, skillRepository } from "../lib/repositories.js"
+import {
+  conversationRepository,
+  generatedFileRepository,
+  messageRepository,
+  skillRepository,
+} from "../lib/repositories.js"
 import { requireAuth } from "../middleware/auth-guard.js"
 import type { RequestIdVariables } from "../middleware/request-id.js"
 import type { SessionVariables } from "../middleware/session.js"
@@ -56,6 +62,12 @@ const chatStreamInputSchema = z.object({
 // ── Provider resolution (per-request, request-scoped) ──────────────────────
 
 function getProvider(): LLMProvider {
+  if (process.env.FAKE_PROVIDER_CHUNKS_JSON) {
+    return new FakeLLMProvider({
+      chunksJson: process.env.FAKE_PROVIDER_CHUNKS_JSON,
+      chunkDelayMs: 1,
+    })
+  }
   if (env.openaiApiKey) {
     return new OpenAIProvider(env.openaiApiKey, env.openaiModel)
   }
@@ -278,19 +290,117 @@ chatRouter.post("/stream", async (c) => {
           data: JSON.stringify({ error: redactString(errorMsg), code: "STREAM_ERROR" }),
         })
       } finally {
-        // Persist the completed assistant message
+        // Persist generated files and update the placeholder message
         if (assistantMsgId) {
+          const fileRepo = generatedFileRepository(actor)
+          const files: Array<{
+            id: string
+            filename: string
+            mimeType: string
+            byteSize: number
+            downloadUrl: string
+          }> = []
+
+          // ── PPTX file generation ──
+          const pptxData = extractPptxJson(accumulatedText)
+          if (pptxData) {
+            try {
+              const result = await generatePptxBuffer(pptxData)
+              const fileRow = await fileRepo.create({
+                id: crypto.randomUUID(),
+                userId: actor.userId,
+                conversationId,
+                messageId: assistantMsgId,
+                filename: result.filename,
+                mimeType: result.mimeType,
+                byteSize: result.byteSize,
+                content: result.buffer,
+              })
+              if (fileRow) {
+                files.push({
+                  id: fileRow.id,
+                  filename: result.filename,
+                  mimeType: result.mimeType,
+                  byteSize: result.byteSize,
+                  downloadUrl: `/api/v1/files/${fileRow.id}`,
+                })
+                await stream.writeSSE({
+                  event: "file",
+                  data: JSON.stringify({
+                    id: fileRow.id,
+                    filename: result.filename,
+                    mimeType: result.mimeType,
+                    byteSize: result.byteSize,
+                    downloadUrl: `/api/v1/files/${fileRow.id}`,
+                  }),
+                })
+              }
+            } catch (fileErr) {
+              const fileErrorMsg =
+                fileErr instanceof Error ? fileErr.message : "PPTX generation failed"
+              await stream.writeSSE({
+                event: "error",
+                data: JSON.stringify({ error: redactString(fileErrorMsg), code: "FILE_GEN_ERROR" }),
+              })
+            }
+          }
+
+          // ── XLSX file generation ──
+          const xlsxData = extractXlsxJson(accumulatedText)
+          if (xlsxData) {
+            try {
+              const result = await generateXlsxBuffer(xlsxData)
+              const fileRow = await fileRepo.create({
+                id: crypto.randomUUID(),
+                userId: actor.userId,
+                conversationId,
+                messageId: assistantMsgId,
+                filename: result.filename,
+                mimeType: result.mimeType,
+                byteSize: result.byteSize,
+                content: result.buffer,
+              })
+              if (fileRow) {
+                files.push({
+                  id: fileRow.id,
+                  filename: result.filename,
+                  mimeType: result.mimeType,
+                  byteSize: result.byteSize,
+                  downloadUrl: `/api/v1/files/${fileRow.id}`,
+                })
+                await stream.writeSSE({
+                  event: "file",
+                  data: JSON.stringify({
+                    id: fileRow.id,
+                    filename: result.filename,
+                    mimeType: result.mimeType,
+                    byteSize: result.byteSize,
+                    downloadUrl: `/api/v1/files/${fileRow.id}`,
+                  }),
+                })
+              }
+            } catch (fileErr) {
+              const fileErrorMsg =
+                fileErr instanceof Error ? fileErr.message : "XLSX generation failed"
+              await stream.writeSSE({
+                event: "error",
+                data: JSON.stringify({ error: redactString(fileErrorMsg), code: "FILE_GEN_ERROR" }),
+              })
+            }
+          }
+
+          // ── Update the placeholder message ──
           const isFailed = !finalUsage && !accumulatedText
-          await msgRepo.create({
-            id: crypto.randomUUID() as MessageId,
-            role: "assistant",
+          await msgRepo.update(assistantMsgId, {
             content: accumulatedText || "[No response generated]",
             metadata: {
-              messageId: assistantMsgId,
+              ...(files.length > 0 ? { files } : {}),
               model,
               usage: finalUsage,
               failed: isFailed,
               completedAt: new Date().toISOString(),
+              skillUsed: result.metadata.skillUsed,
+              memoryEntriesUsed: result.metadata.memoryEntriesUsed,
             },
           })
         }
@@ -302,25 +412,6 @@ chatRouter.post("/stream", async (c) => {
             model,
             usage: finalUsage,
           })
-        }
-
-        // Generate xlsx file if the response contains xlsx-json
-        const xlsxData = extractXlsxJson(accumulatedText)
-        if (xlsxData) {
-          try {
-            const fileMeta = await generateXlsxFile(xlsxData)
-            await stream.writeSSE({
-              event: "file",
-              data: JSON.stringify(fileMeta),
-            })
-          } catch (fileErr) {
-            const fileErrorMsg =
-              fileErr instanceof Error ? fileErr.message : "File generation failed"
-            await stream.writeSSE({
-              event: "error",
-              data: JSON.stringify({ error: redactString(fileErrorMsg), code: "FILE_GEN_ERROR" }),
-            })
-          }
         }
       }
     })

@@ -4,6 +4,7 @@ import { Download, Sparkles, User } from "lucide-react"
 import { useCallback, useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { stripGeneratedJsonBlocks } from "./chat-transcript-helpers"
 import type { ChatMessage, FileAttachment } from "./types"
 import { useTypewriter } from "./use-typewriter"
 
@@ -111,7 +112,7 @@ function MessageRow({
 }) {
   const isUser = message.role === "user"
   const label = isUser ? userName.split(" ")[0] || userName : "Assistant"
-  const displayContent = isUser ? message.content : stripXlsxJsonBlocks(message.content)
+  const displayContent = isUser ? message.content : stripGeneratedJsonBlocks(message.content)
 
   return (
     <div className="mb-spacing-8 flex gap-spacing-4">
@@ -148,10 +149,6 @@ function AssistantMessageContent({
       {isTyping && <StreamingCursor />}
     </div>
   )
-}
-
-function stripXlsxJsonBlocks(text: string): string {
-  return text.replace(/```xlsx-json\s*\n[\s\S]*?\n```/g, "").trim()
 }
 
 function FileDownloads({ files }: { readonly files: readonly FileAttachment[] }) {

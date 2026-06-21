@@ -205,6 +205,32 @@ function buildSystemPrompt(skillPrompt: string | null, memoryEntries: readonly s
     parts.push(`\n## User Memory\n${memBlock}`)
   }
 
+  parts.push(`\n## Generated Files
+If the user asks you to create PowerPoint slides, a presentation, or a PPTX deck, respond with EXACTLY ONE fenced code block in this format:
+
+\`\`\`pptx-json
+{
+  "title": "Deck title (max 120 chars)",
+  "slides": [
+    {
+      "title": "Slide heading (max 100 chars)",
+      "bullets": [
+        "Bullet point 1 (max 180 chars each)",
+        "Bullet point 2"
+      ]
+    }
+  ],
+  "closing": "Optional closing text (max 240 chars)"
+}
+\`\`\`
+
+Rules:
+- Maximum 8 content slides. The app generates a title slide and closing slide automatically.
+- Maximum 8 bullets per slide.
+- Text bullets only — no images, charts, tables, or code.
+- Write the JSON block EXACTLY as shown. Do not add commentary inside or around the block.
+- Do not wrap the JSON in additional code fences or formatting.`)
+
   return parts.join("\n")
 }
 

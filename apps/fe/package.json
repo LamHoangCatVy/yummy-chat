@@ -14,6 +14,7 @@
     "test:contracts": "vitest run tests/api-contract.test.ts",
     "smoke:core": "playwright test --config playwright.config.ts tests/e2e/core-smoke.spec.ts",
     "smoke:advanced": "playwright test --config playwright.config.ts tests/e2e/advanced-smoke.spec.ts",
+    "smoke:pptx": "playwright test --config playwright.pptx.config.ts",
     "test:a11y": "playwright test --config playwright.a11y.config.ts",
     "test:visual": "playwright test --config playwright.visual.config.ts"
   },

@@ -162,6 +162,41 @@ export const healthResponseSchema = z.object({
   timestamp: z.string().datetime(),
 })
 
+export const PPTX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation" as const
+
+export const GENERATED_FILE_MAX_BYTES = 10 * 1024 * 1024
+
+export const PPTX_LIMITS = {
+  maxSlides: 10,
+  maxContentSlides: 8,
+  maxBulletsPerSlide: 8,
+  maxBulletChars: 180,
+  maxDeckTitleChars: 120,
+  maxSlideTitleChars: 100,
+} as const
+
+export const fileAttachmentSchema = z.object({
+  filename: z.string().min(1).max(200),
+  downloadUrl: z.string().min(1),
+  mimeType: z.string().min(1),
+})
+
+export const pptxSlideSchema = z
+  .object({
+    title: z.string().min(1).max(100),
+    bullets: z.array(z.string().min(1).max(180)).min(1).max(8),
+  })
+  .strict()
+
+export const pptxJsonDataSchema = z
+  .object({
+    title: z.string().min(1).max(120),
+    slides: z.array(pptxSlideSchema).min(1).max(8),
+    closing: z.string().min(1).max(240).optional(),
+  })
+  .strict()
+
 export type ChatMessage = z.infer<typeof chatMessageSchema>
 export type Conversation = z.infer<typeof conversationSchema>
 export type Skill = z.infer<typeof skillSchema>
@@ -185,3 +220,6 @@ export type ModelListResponse = z.infer<typeof modelListResponseSchema>
 export type AdvancedSettingsGetResponse = z.infer<typeof advancedSettingsGetResponseSchema>
 export type AdvancedSettingsPutInput = z.infer<typeof advancedSettingsPutInputSchema>
 export type HealthResponse = z.infer<typeof healthResponseSchema>
+export type FileAttachment = z.infer<typeof fileAttachmentSchema>
+export type PptxSlideData = z.infer<typeof pptxSlideSchema>
+export type PptxJsonData = z.infer<typeof pptxJsonDataSchema>

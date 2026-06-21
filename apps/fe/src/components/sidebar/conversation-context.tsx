@@ -31,7 +31,14 @@ export function ConversationProvider({ children }: { readonly children: ReactNod
 
   return (
     <ConversationContext.Provider
-      value={{ activeId, setActiveId, triggerRefresh, refreshKey, disableNewChat, setDisableNewChat }}
+      value={{
+        activeId,
+        setActiveId,
+        triggerRefresh,
+        refreshKey,
+        disableNewChat,
+        setDisableNewChat,
+      }}
     >
       {children}
     </ConversationContext.Provider>

@@ -3,6 +3,7 @@ import { db } from "@yummy/db"
 import {
   conversation,
   conversationSkillSnapshot,
+  generatedChatFile,
   memoryEntry,
   message,
   skill,
@@ -142,6 +143,21 @@ export function messageRepository(conversationId: ConversationId) {
           parentId: data.parentId ?? null,
           metadata: data.metadata ?? null,
         })
+        .returning()
+        .then((rows) => rows[0])
+    },
+
+    update(
+      id: string,
+      data: { content?: string; metadata?: Record<string, unknown> },
+    ): Promise<MessageRow | undefined> {
+      const setData: Record<string, unknown> = { updatedAt: new Date() }
+      if (data.content !== undefined) setData.content = data.content
+      if (data.metadata !== undefined) setData.metadata = data.metadata
+      return db
+        .update(message)
+        .set(setData)
+        .where(and(eq(message.id, id), eq(message.conversationId, conversationId)))
         .returning()
         .then((rows) => rows[0])
     },
@@ -403,6 +419,48 @@ export function apiSettingsRepository(actor: Actor) {
         .where(eq(userApiSettings.userId, actor.userId))
         .returning()
         .then((rows) => rows.length > 0)
+    },
+  }
+}
+
+export type GeneratedChatFileRow = typeof generatedChatFile.$inferSelect
+
+export function generatedFileRepository(actor: Actor) {
+  return {
+    create(data: {
+      id: string
+      userId: string
+      conversationId: string
+      messageId?: string
+      filename: string
+      mimeType: string
+      byteSize: number
+      content: Buffer
+      metadata?: Record<string, unknown>
+    }): Promise<GeneratedChatFileRow | undefined> {
+      return db
+        .insert(generatedChatFile)
+        .values({
+          id: data.id,
+          userId: data.userId,
+          conversationId: data.conversationId,
+          messageId: data.messageId ?? null,
+          filename: data.filename,
+          mimeType: data.mimeType,
+          byteSize: data.byteSize,
+          content: data.content,
+          metadata: data.metadata ?? null,
+        })
+        .returning()
+        .then((rows) => rows[0])
+    },
+
+    getById(id: string): Promise<GeneratedChatFileRow | undefined> {
+      return db
+        .select()
+        .from(generatedChatFile)
+        .where(and(eq(generatedChatFile.id, id), eq(generatedChatFile.userId, actor.userId)))
+        .then((rows) => rows[0])
     },
   }
 }

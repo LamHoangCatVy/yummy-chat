@@ -29,6 +29,13 @@
       "when": 1781860600000,
       "tag": "0003_add_api_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781912000000,
+      "tag": "0004_add_generated_chat_file",
+      "breakpoints": true
     }
   ]
 }

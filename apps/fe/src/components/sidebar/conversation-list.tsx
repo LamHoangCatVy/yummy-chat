@@ -1,7 +1,7 @@
 "use client"
 
-import { createConversation, deleteConversation, listConversations } from "@/lib/api"
 import { useConversation } from "@/components/sidebar/conversation-context"
+import { createConversation, deleteConversation, listConversations } from "@/lib/api"
 import type { Conversation } from "@yummy/shared"
 import { AlertCircle, Loader2, SquarePen, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -44,7 +44,7 @@ export function ConversationList({
   const [status, setStatus] = useState<ListStatus>("idle")
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
-  const { refreshKey, disableNewChat } = useConversation()
+  const { disableNewChat } = useConversation()
 
   const fetchList = useCallback(async () => {
     setStatus("loading")
@@ -60,10 +60,10 @@ export function ConversationList({
     }
   }, [])
 
-  // Fetch on mount and when refreshKey changes
+  // Fetch on mount
   useEffect(() => {
     void fetchList()
-  }, [fetchList, refreshKey])
+  }, [fetchList])
 
   const handleNewChat = useCallback(async () => {
     if (isCreating) return
@@ -220,7 +220,9 @@ function ConversationItem({
         }`}
         aria-current={isActive ? "page" : undefined}
       >
-        <span className="min-w-0 truncate text-[0.8125rem] leading-[1.5]">{conversation.title}</span>
+        <span className="min-w-0 truncate text-[0.8125rem] leading-[1.5]">
+          {conversation.title}
+        </span>
       </button>
       <button
         type="button"

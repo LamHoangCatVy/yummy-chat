@@ -8,6 +8,12 @@ import {
   healthResponseSchema,
   memoryListResponseSchema,
   modelListResponseSchema,
+  fileAttachmentSchema,
+  pptxSlideSchema,
+  pptxJsonDataSchema,
+  PPTX_MIME_TYPE,
+  GENERATED_FILE_MAX_BYTES,
+  PPTX_LIMITS,
   sendMessageInputSchema,
   sendMessageResponseSchema,
   skillListResponseSchema,
@@ -583,5 +589,156 @@ describe("Contract: FE client error handling", () => {
     } finally {
       globalThis.fetch = originalFetch
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 4. PPTX / File-generation contract schemas
+// ---------------------------------------------------------------------------
+describe("Contract: PPTX schemas", () => {
+  test("fileAttachmentSchema parses valid attachment", () => {
+    const raw = {
+      filename: "report.pptx",
+      downloadUrl: "https://cdn.example.com/r.pptx",
+      mimeType: PPTX_MIME_TYPE,
+    }
+    const result = fileAttachmentSchema.parse(raw)
+    expect(result.filename).toBe("report.pptx")
+    expect(result.mimeType).toBe(PPTX_MIME_TYPE)
+  })
+
+  test("fileAttachmentSchema rejects empty filename", () => {
+    expect(() =>
+      fileAttachmentSchema.parse({
+        filename: "",
+        downloadUrl: "https://cdn.example.com/r.pptx",
+        mimeType: PPTX_MIME_TYPE,
+      }),
+    ).toThrow()
+  })
+
+  test("fileAttachmentSchema rejects missing downloadUrl", () => {
+    expect(() =>
+      fileAttachmentSchema.parse({ filename: "r.pptx", mimeType: PPTX_MIME_TYPE }),
+    ).toThrow()
+  })
+
+  test("pptxSlideSchema parses valid slide", () => {
+    const raw = { title: "Introduction", bullets: ["Point one", "Point two"] }
+    const result = pptxSlideSchema.parse(raw)
+    expect(result.title).toBe("Introduction")
+    expect(result.bullets).toHaveLength(2)
+  })
+
+  test("pptxSlideSchema rejects empty title", () => {
+    expect(() => pptxSlideSchema.parse({ title: "", bullets: ["Point"] })).toThrow()
+  })
+
+  test("pptxSlideSchema rejects empty bullets array", () => {
+    expect(() => pptxSlideSchema.parse({ title: "Title", bullets: [] })).toThrow()
+  })
+
+  test("pptxSlideSchema rejects long title (>100 chars)", () => {
+    expect(() => pptxSlideSchema.parse({ title: "x".repeat(101), bullets: ["Point"] })).toThrow()
+  })
+
+  test("pptxSlideSchema rejects bullet >180 chars", () => {
+    expect(() => pptxSlideSchema.parse({ title: "Title", bullets: ["x".repeat(181)] })).toThrow()
+  })
+
+  test("pptxSlideSchema rejects more than 8 bullets", () => {
+    expect(() =>
+      pptxSlideSchema.parse({
+        title: "Title",
+        bullets: Array.from({ length: 9 }, (_, i) => `Bullet ${i + 1}`),
+      }),
+    ).toThrow()
+  })
+
+  test("pptxSlideSchema rejects unknown properties (strict mode)", () => {
+    expect(() =>
+      pptxSlideSchema.parse({ title: "Title", bullets: ["Point"], images: ["img.jpg"] }),
+    ).toThrow()
+  })
+
+  test("pptxJsonDataSchema parses valid data with closing", () => {
+    const raw = {
+      title: "Deck Title",
+      slides: [{ title: "Slide 1", bullets: ["Bullet A", "Bullet B"] }],
+      closing: "Thank you!",
+    }
+    const result = pptxJsonDataSchema.parse(raw)
+    expect(result.title).toBe("Deck Title")
+    expect(result.slides).toHaveLength(1)
+    expect(result.closing).toBe("Thank you!")
+  })
+
+  test("pptxJsonDataSchema parses valid data without closing", () => {
+    const raw = {
+      title: "Deck Title",
+      slides: [{ title: "Slide 1", bullets: ["Bullet A"] }],
+    }
+    const result = pptxJsonDataSchema.parse(raw)
+    expect(result.title).toBe("Deck Title")
+    expect(result.closing).toBeUndefined()
+  })
+
+  test("pptxJsonDataSchema rejects more than 8 content slides", () => {
+    const slides = Array.from({ length: 9 }, (_, i) => ({
+      title: `Slide ${i + 1}`,
+      bullets: ["Content"],
+    }))
+    expect(() => pptxJsonDataSchema.parse({ title: "Deck Title", slides })).toThrow()
+  })
+
+  test("pptxJsonDataSchema rejects empty slides array", () => {
+    expect(() => pptxJsonDataSchema.parse({ title: "Deck Title", slides: [] })).toThrow()
+  })
+
+  test("pptxJsonDataSchema rejects missing title", () => {
+    const raw = { slides: [{ title: "Slide 1", bullets: ["Bullet"] }] }
+    expect(() => pptxJsonDataSchema.parse(raw)).toThrow()
+  })
+
+  test("pptxJsonDataSchema rejects deck title >120 chars", () => {
+    const raw = { title: "x".repeat(121), slides: [{ title: "S1", bullets: ["B"] }] }
+    expect(() => pptxJsonDataSchema.parse(raw)).toThrow()
+  })
+
+  test("pptxJsonDataSchema rejects closing >240 chars", () => {
+    const raw = {
+      title: "Deck",
+      slides: [{ title: "S1", bullets: ["B"] }],
+      closing: "x".repeat(241),
+    }
+    expect(() => pptxJsonDataSchema.parse(raw)).toThrow()
+  })
+
+  test("pptxJsonDataSchema rejects unknown properties (strict mode)", () => {
+    const raw = {
+      title: "Deck",
+      slides: [{ title: "S1", bullets: ["B"] }],
+      theme: "dark",
+    }
+    expect(() => pptxJsonDataSchema.parse(raw)).toThrow()
+  })
+
+  test("PPTX_MIME_TYPE constant is correct", () => {
+    expect(PPTX_MIME_TYPE).toBe(
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+  })
+
+  test("GENERATED_FILE_MAX_BYTES constant is 10MB", () => {
+    expect(GENERATED_FILE_MAX_BYTES).toBe(10 * 1024 * 1024)
+  })
+
+  test("PPTX_LIMITS constant defines correct limits", () => {
+    expect(PPTX_LIMITS.maxSlides).toBe(10)
+    expect(PPTX_LIMITS.maxContentSlides).toBe(8)
+    expect(PPTX_LIMITS.maxBulletsPerSlide).toBe(8)
+    expect(PPTX_LIMITS.maxBulletChars).toBe(180)
+    expect(PPTX_LIMITS.maxDeckTitleChars).toBe(120)
+    expect(PPTX_LIMITS.maxSlideTitleChars).toBe(100)
   })
 })

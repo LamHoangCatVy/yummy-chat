@@ -233,14 +233,29 @@ export interface MessageListItem {
   readonly role: "system" | "user" | "assistant"
   readonly content: string
   readonly createdAt: string
+  readonly metadata?: Record<string, unknown> | null
 }
 
-const messageListItemSchema = z.object({
-  id: z.string(),
-  role: z.enum(["system", "user", "assistant"]),
-  content: z.string(),
-  createdAt: z.string(),
-})
+export const messageListItemSchema = z
+  .object({
+    id: z.string(),
+    role: z.enum(["system", "user", "assistant"]),
+    content: z.string(),
+    createdAt: z.string(),
+    metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .transform((message): MessageListItem => {
+    if (message.metadata === undefined) {
+      return {
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        createdAt: message.createdAt,
+      }
+    }
+
+    return message as MessageListItem
+  })
 
 const messageListResponseSchema = z.object({
   data: z.array(messageListItemSchema),

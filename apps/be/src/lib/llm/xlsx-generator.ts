@@ -1,19 +1,16 @@
 import { randomUUID } from "node:crypto"
-import { access, mkdir } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 
-const TEMP_DIR = join(tmpdir(), "yummy-chat-files")
-
-interface XlsxSheetData {
+export interface XlsxSheetData {
   readonly name: string
   readonly headers: readonly string[]
   readonly rows: readonly (readonly (string | number | null)[])[]
 }
 
-interface XlsxJsonData {
+export interface XlsxJsonData {
   readonly sheets: readonly XlsxSheetData[]
 }
+
+const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 const XLSX_JSON_PATTERN = /```xlsx-json\s*\n([\s\S]*?)\n```/
 
@@ -30,10 +27,15 @@ export function extractXlsxJson(text: string): XlsxJsonData | null {
   }
 }
 
-export async function generateXlsxFile(data: XlsxJsonData): Promise<{
+/**
+ * Generate an XLSX workbook and return the buffer + metadata.
+ * Does NOT write to disk — use this for DB persistence.
+ */
+export async function generateXlsxBuffer(data: XlsxJsonData): Promise<{
   filename: string
-  downloadUrl: string
   mimeType: string
+  byteSize: number
+  buffer: Buffer
 }> {
   const ExcelJS = await import("exceljs")
   const workbook = new ExcelJS.Workbook()
@@ -46,25 +48,32 @@ export async function generateXlsxFile(data: XlsxJsonData): Promise<{
     }
   }
 
+  const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer
   const fileId = randomUUID()
-  await mkdir(TEMP_DIR, { recursive: true })
-  const filename = `${fileId}.xlsx`
-  const filepath = join(TEMP_DIR, filename)
-  await workbook.xlsx.writeFile(filepath)
 
   return {
     filename: `output-${fileId.slice(0, 8)}.xlsx`,
-    downloadUrl: `/api/v1/files/${fileId}`,
-    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    mimeType: XLSX_MIME_TYPE,
+    byteSize: buffer.length,
+    buffer,
   }
 }
 
-export async function getFilePath(fileId: string): Promise<string | null> {
-  const filepath = join(TEMP_DIR, `${fileId}.xlsx`)
-  try {
-    await access(filepath)
-    return filepath
-  } catch {
-    return null
+/**
+ * @deprecated Use `generateXlsxBuffer()` for DB-backed persistence.
+ * Legacy helper that writes to a temp file.
+ */
+export async function generateXlsxFile(data: XlsxJsonData): Promise<{
+  filename: string
+  downloadUrl: string
+  mimeType: string
+}> {
+  const result = await generateXlsxBuffer(data)
+  // Legacy callers expect a downloadUrl — file is still returned as buffer
+  // but the caller must persist it separately (this is kept for backward compat).
+  return {
+    filename: result.filename,
+    downloadUrl: "",
+    mimeType: result.mimeType,
   }
 }

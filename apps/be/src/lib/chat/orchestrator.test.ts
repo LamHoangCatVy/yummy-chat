@@ -64,7 +64,8 @@ describe("chat orchestrator", () => {
         actor,
       )
 
-      expect(result.systemPrompt).toBe("You are a helpful assistant.")
+      expect(result.systemPrompt).toContain("You are a helpful assistant.")
+      expect(result.systemPrompt).toContain("## Generated Files")
       expect(result.metadata.skillUsed).toBeNull()
       expect(result.metadata.memoryEntriesUsed).toBe(0)
 

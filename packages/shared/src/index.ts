@@ -56,6 +56,12 @@ export {
   updateMemoryInputSchema,
   updateSkillInputSchema,
   userIdSchema,
+  fileAttachmentSchema,
+  pptxSlideSchema,
+  pptxJsonDataSchema,
+  PPTX_MIME_TYPE,
+  GENERATED_FILE_MAX_BYTES,
+  PPTX_LIMITS,
 } from "./schemas"
 
 export type {
@@ -82,4 +88,7 @@ export type {
   UpdateConversationInput,
   UpdateMemoryInput,
   UpdateSkillInput,
+  FileAttachment,
+  PptxSlideData,
+  PptxJsonData,
 } from "./schemas"

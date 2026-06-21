@@ -5,12 +5,12 @@ import type { ApiErrorResponse, ApiResponse, ConversationId, UserId } from "@yum
 import { Hono } from "hono"
 import { z } from "zod"
 import type { Actor } from "../lib/authz.js"
-import { conversationRepository, messageRepository } from "../lib/repositories.js"
 import { decrypt } from "../lib/encryption.js"
 import { env } from "../lib/env.js"
 import { FakeLLMProvider } from "../lib/llm/fake-provider.js"
 import { OpenAIProvider } from "../lib/llm/openai-provider.js"
 import type { CompleteRequest, LLMProvider, ProviderMessage } from "../lib/llm/provider.js"
+import { conversationRepository, messageRepository } from "../lib/repositories.js"
 import { requireAuth } from "../middleware/auth-guard.js"
 import type { RequestIdVariables } from "../middleware/request-id.js"
 import type { SessionVariables } from "../middleware/session.js"
@@ -169,9 +169,7 @@ generateTitleRouter.post("/", async (c) => {
 
   const provider = await resolveProviderForUser(user.id)
 
-  const contextMessages: ProviderMessage[] = [
-    { role: "user", content: firstUserContent },
-  ]
+  const contextMessages: ProviderMessage[] = [{ role: "user", content: firstUserContent }]
   if (firstAssistantContent) {
     contextMessages.push({ role: "assistant", content: firstAssistantContent })
   }
