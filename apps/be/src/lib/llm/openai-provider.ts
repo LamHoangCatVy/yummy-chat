@@ -6,6 +6,20 @@ import type {
   StreamRequest,
 } from "./provider.js"
 
+/**
+ * Minimal delta shape including provider-specific reasoning fields.
+ *
+ * The OpenAI SDK types do not expose `reasoning_content` / `reasoning` because
+ * they are provider-specific (DeepSeek R1, OpenAI-compatible gateways).  We
+ * widen the SDK delta to this interface via `as unknown` so the reasoning
+ * stream can be read in a type-safe way without suppressing types.
+ */
+interface ReasoningCapableDelta {
+  readonly content?: string | null
+  readonly reasoning_content?: string | null
+  readonly reasoning?: string | null
+}
+
 export class OpenAIProvider implements LLMProvider {
   private readonly apiKey: string
   private readonly defaultModel: string
@@ -52,10 +66,19 @@ export class OpenAIProvider implements LLMProvider {
           return
         }
 
-        const delta = chunk.choices[0]?.delta?.content
-        if (delta) {
-          outputTokens += Math.ceil(delta.length / 4)
-          yield { type: "text-delta", textDelta: delta }
+        const choice = chunk.choices[0]
+        if (choice) {
+          const delta = choice.delta as unknown as ReasoningCapableDelta
+
+          const reasoning = delta.reasoning_content ?? delta.reasoning
+          if (typeof reasoning === "string" && reasoning.length > 0) {
+            yield { type: "reasoning-delta", reasoningDelta: reasoning }
+          }
+
+          if (typeof delta.content === "string" && delta.content.length > 0) {
+            outputTokens += Math.ceil(delta.content.length / 4)
+            yield { type: "text-delta", textDelta: delta.content }
+          }
         }
 
         if (chunk.usage) {

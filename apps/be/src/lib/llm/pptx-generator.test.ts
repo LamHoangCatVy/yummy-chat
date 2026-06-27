@@ -8,12 +8,17 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 // ---------------------------------------------------------------------------
 
 const mockPptxAddText = vi.fn()
-const mockPptxAddSlide = vi.fn(() => ({ addText: mockPptxAddText }))
+const mockPptxAddShape = vi.fn()
+const mockPptxDefineSlideMaster = vi.fn()
+const mockPptxAddSlide = vi.fn(() => ({ addText: mockPptxAddText, addShape: mockPptxAddShape }))
 const mockPptxWrite = vi.fn<() => Promise<Buffer>>()
+const mockShapeType = { rect: "rect", line: "line", roundRect: "roundRect" }
 
 vi.mock("pptxgenjs", () => ({
   default: vi.fn().mockImplementation(() => ({
     layout: "",
+    ShapeType: mockShapeType,
+    defineSlideMaster: mockPptxDefineSlideMaster,
     addSlide: mockPptxAddSlide,
     write: mockPptxWrite,
   })),
@@ -163,6 +168,8 @@ describe("generatePptxBuffer", () => {
   it("calls pptxgenjs with correct slide structure", async () => {
     mockPptxAddSlide.mockClear()
     mockPptxAddText.mockClear()
+    mockPptxAddShape.mockClear()
+    mockPptxDefineSlideMaster.mockClear()
     mockPptxWrite.mockResolvedValue(smallZipBuffer())
 
     const deck: PptxJsonData = {
@@ -179,8 +186,16 @@ describe("generatePptxBuffer", () => {
     // Title slide + 2 content slides + closing slide = 4 slides
     expect(mockPptxAddSlide).toHaveBeenCalledTimes(4)
 
-    // addText called: title slide (2: title + subtitle), 2 content (2 each: title + bullets), closing (1) = 7
-    expect(mockPptxAddText).toHaveBeenCalledTimes(7)
+    // One global slide master defined
+    expect(mockPptxDefineSlideMaster).toHaveBeenCalledTimes(1)
+
+    // addText: title(1) + 2 content(2 each: title+bullets) + closing(1) = 6
+    expect(mockPptxAddText).toHaveBeenCalledTimes(6)
+
+    // addShape: title(2: accent bar + accent line)
+    //         + 2 STANDARD_CONTENT(3 each: title accent + card bg + card accent bar)
+    //         + closing(1: accent line) = 9
+    expect(mockPptxAddShape).toHaveBeenCalledTimes(9)
   })
 
   it("throws when the generated buffer exceeds GENERATED_FILE_MAX_BYTES", async () => {

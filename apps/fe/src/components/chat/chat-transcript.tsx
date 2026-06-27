@@ -1,7 +1,7 @@
 "use client"
 
-import { Download, Sparkles, User } from "lucide-react"
-import { useCallback, useEffect, useRef } from "react"
+import { Brain, ChevronDown, Download, Sparkles, User } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { stripGeneratedJsonBlocks } from "./chat-transcript-helpers"
@@ -52,9 +52,10 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
   }
 
   const lastMessage = messages[messages.length - 1]
-  const currentLastMessageContentLength = lastMessage?.content.length ?? 0
-  if (currentLastMessageContentLength !== lastMessageContentLengthRef.current) {
-    lastMessageContentLengthRef.current = currentLastMessageContentLength
+  const currentLastMessageLength =
+    (lastMessage?.content.length ?? 0) + (lastMessage?.reasoningContent?.length ?? 0)
+  if (currentLastMessageLength !== lastMessageContentLengthRef.current) {
+    lastMessageContentLengthRef.current = currentLastMessageLength
     if (isAtBottomRef.current) {
       requestAnimationFrame(scrollToBottom)
     }
@@ -125,7 +126,19 @@ function MessageRow({
           {isUser ? (
             <span className="whitespace-pre-wrap">{displayContent}</span>
           ) : (
-            <AssistantMessageContent content={displayContent} isStreaming={message.isStreaming} />
+            <>
+              {message.reasoningContent && (
+                <ThinkingPanel
+                  reasoning={message.reasoningContent}
+                  isStreaming={message.isStreaming}
+                />
+              )}
+              <AssistantMessageContent
+                content={displayContent}
+                isStreaming={message.isStreaming}
+                hasReasoning={!!message.reasoningContent}
+              />
+            </>
           )}
           {message.files && message.files.length > 0 && <FileDownloads files={message.files} />}
         </div>
@@ -137,11 +150,21 @@ function MessageRow({
 function AssistantMessageContent({
   content,
   isStreaming,
+  hasReasoning,
 }: {
   readonly content: string
   readonly isStreaming: boolean
+  readonly hasReasoning: boolean
 }) {
   const { text: typedText, isTyping } = useTypewriter(content, isStreaming)
+
+  if (content.length === 0 && isStreaming) {
+    return hasReasoning ? null : <TypingIndicator />
+  }
+
+  if (content.length === 0) {
+    return null
+  }
 
   return (
     <div className="prose-chat">
@@ -186,5 +209,78 @@ function StreamingCursor() {
       className="ml-[2px] inline-block h-[1em] w-[2px] animate-pulse bg-text-primary align-text-bottom"
       aria-label="Streaming"
     />
+  )
+}
+
+function ThinkingDots() {
+  return (
+    <span className="inline-flex items-center gap-[3px]" aria-hidden="true">
+      <span
+        className="h-[4px] w-[4px] animate-bounce rounded-full bg-text-secondary"
+        style={{ animationDelay: "-0.3s" }}
+      />
+      <span
+        className="h-[4px] w-[4px] animate-bounce rounded-full bg-text-secondary"
+        style={{ animationDelay: "-0.15s" }}
+      />
+      <span className="h-[4px] w-[4px] animate-bounce rounded-full bg-text-secondary" />
+    </span>
+  )
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-[4px] py-spacing-1" aria-label="Assistant is typing">
+      <span
+        className="h-[7px] w-[7px] animate-bounce rounded-full bg-text-secondary"
+        style={{ animationDelay: "-0.3s" }}
+      />
+      <span
+        className="h-[7px] w-[7px] animate-bounce rounded-full bg-text-secondary"
+        style={{ animationDelay: "-0.15s" }}
+      />
+      <span className="h-[7px] w-[7px] animate-bounce rounded-full bg-text-secondary" />
+    </div>
+  )
+}
+
+function ThinkingPanel({
+  reasoning,
+  isStreaming,
+}: {
+  readonly reasoning: string
+  readonly isStreaming: boolean
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+  const { text: typedReasoning, isTyping } = useTypewriter(reasoning, isStreaming)
+  const visible = isStreaming || !collapsed
+
+  return (
+    <div className="mb-spacing-3">
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        disabled={isStreaming}
+        className="flex items-center gap-spacing-2 text-[0.8125rem] font-medium text-text-secondary transition-colors hover:text-text-primary disabled:hover:text-text-secondary"
+        aria-expanded={visible}
+      >
+        <Brain size={14} />
+        <span>{isStreaming ? "Thinking" : "Thought process"}</span>
+        {isStreaming ? (
+          <ThinkingDots />
+        ) : (
+          <ChevronDown
+            size={14}
+            className={`transition-transform duration-150 ${collapsed ? "" : "rotate-180"}`}
+          />
+        )}
+      </button>
+      {visible && (
+        <div className="mt-spacing-2 border-l-2 border-border-subtle pl-spacing-3 text-[0.875rem] leading-[1.6] text-text-secondary">
+          <span className="whitespace-pre-wrap">{typedReasoning}</span>
+          {isTyping && <StreamingCursor />}
+        </div>
+      )}
+    </div>
   )
 }

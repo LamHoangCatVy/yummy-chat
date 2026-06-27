@@ -23,6 +23,8 @@ export interface ChatMessage {
   readonly createdAt: string
   /** File attachments generated during the response (e.g., xlsx downloads). */
   readonly files?: readonly FileAttachment[]
+  /** Reasoning/thinking content streamed by a reasoning model, separate from the answer. */
+  readonly reasoningContent?: string
 }
 
 /** A file attachment from the assistant that the user can download. */
@@ -38,6 +40,10 @@ export type StreamStatus = "idle" | "streaming" | "error" | "done"
 /** SSE event types from the backend /api/v1/chat/stream endpoint. */
 export interface StreamTextEvent {
   readonly text: string
+}
+
+export interface StreamReasoningEvent {
+  readonly reasoning: string
 }
 
 export interface StreamFinishEvent {

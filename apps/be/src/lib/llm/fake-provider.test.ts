@@ -177,4 +177,37 @@ describe("FakeLLMProvider", () => {
       )
     }
   })
+
+  it("emits reasoning chunks before text chunks", async () => {
+    const provider = new FakeLLMProvider({
+      reasoningChunks: ["Let me think", " about this."],
+      chunks: ["The answer", " is 42."],
+      chunkDelayMs: 1,
+    })
+
+    const chunks = await collectChunks(
+      provider.stream({
+        messages: [{ role: "user", content: "test" }],
+        model: "fake",
+      }),
+    )
+
+    const reasoningChunks = chunks.filter((c) => c.type === "reasoning-delta")
+    const textChunks = chunks.filter((c) => c.type === "text-delta")
+
+    expect(reasoningChunks.length).toBe(2)
+    expect(textChunks.length).toBe(2)
+
+    const reasoningText = reasoningChunks
+      .map((c) => (c.type === "reasoning-delta" ? c.reasoningDelta : ""))
+      .join("")
+    expect(reasoningText).toBe("Let me think about this.")
+
+    const text = textChunks.map((c) => (c.type === "text-delta" ? c.textDelta : "")).join("")
+    expect(text).toBe("The answer is 42.")
+
+    const firstReasoningIndex = chunks.findIndex((c) => c.type === "reasoning-delta")
+    const firstTextIndex = chunks.findIndex((c) => c.type === "text-delta")
+    expect(firstReasoningIndex).toBeLessThan(firstTextIndex)
+  })
 })

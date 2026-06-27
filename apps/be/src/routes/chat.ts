@@ -65,6 +65,9 @@ function getProvider(): LLMProvider {
   if (process.env.FAKE_PROVIDER_CHUNKS_JSON) {
     return new FakeLLMProvider({
       chunksJson: process.env.FAKE_PROVIDER_CHUNKS_JSON,
+      ...(process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON
+        ? { reasoningChunksJson: process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON }
+        : {}),
       chunkDelayMs: 1,
     })
   }
@@ -199,6 +202,7 @@ chatRouter.post("/stream", async (c) => {
 
   let assistantMsgId: MessageId | null = null
   let accumulatedText = ""
+  let accumulatedReasoning = ""
   let finalUsage: UsageMetadata | null = null
 
   const ctx = auditFromContext(c)
@@ -256,6 +260,14 @@ chatRouter.post("/stream", async (c) => {
               await stream.writeSSE({
                 event: "text",
                 data: JSON.stringify({ text: chunk.textDelta }),
+              })
+              break
+            }
+            case "reasoning-delta": {
+              accumulatedReasoning += chunk.reasoningDelta
+              await stream.writeSSE({
+                event: "reasoning",
+                data: JSON.stringify({ reasoning: chunk.reasoningDelta }),
               })
               break
             }
@@ -395,6 +407,7 @@ chatRouter.post("/stream", async (c) => {
             content: accumulatedText || "[No response generated]",
             metadata: {
               ...(files.length > 0 ? { files } : {}),
+              ...(accumulatedReasoning ? { reasoningContent: accumulatedReasoning } : {}),
               model,
               usage: finalUsage,
               failed: isFailed,

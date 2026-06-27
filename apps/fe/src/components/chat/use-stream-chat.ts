@@ -185,6 +185,23 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                 } else if (
                   typeof parsed === "object" &&
                   parsed !== null &&
+                  "reasoning" in parsed &&
+                  typeof (parsed as { reasoning: unknown }).reasoning === "string"
+                ) {
+                  const reasoningDelta = (parsed as { reasoning: string }).reasoning
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? {
+                            ...m,
+                            reasoningContent: (m.reasoningContent ?? "") + reasoningDelta,
+                          }
+                        : m,
+                    ),
+                  )
+                } else if (
+                  typeof parsed === "object" &&
+                  parsed !== null &&
                   "finishReason" in parsed
                 ) {
                   // Finish event — mark streaming as done

@@ -22,6 +22,10 @@ export interface FakeProviderOptions {
   readonly chunks?: readonly string[]
   /** JSON string of a string array, e.g. '["Hello","```pptx-json\\n...","```"]'. Parsed at constructor time. */
   readonly chunksJson?: string
+  /** Reasoning/thinking chunks emitted before the answer (simulates reasoning models). */
+  readonly reasoningChunks?: readonly string[]
+  /** JSON string of a string array for reasoning chunks. Parsed at constructor time. */
+  readonly reasoningChunksJson?: string
   /** Delay in ms between chunks.  Defaults to 50. */
   readonly chunkDelayMs?: number
   /** If set, throw after emitting this many text chunks. */
@@ -38,6 +42,7 @@ const DEFAULT_DELAY_MS = 50
 
 export class FakeLLMProvider implements LLMProvider {
   private readonly chunks: readonly string[]
+  private readonly reasoningChunks: readonly string[]
   private readonly chunkDelayMs: number
   private readonly errorAfterChunks: number | undefined
   private readonly errorMessage: string
@@ -49,6 +54,11 @@ export class FakeLLMProvider implements LLMProvider {
     } else {
       this.chunks = options.chunks ?? DEFAULT_CHUNKS
     }
+    if (options.reasoningChunksJson) {
+      this.reasoningChunks = JSON.parse(options.reasoningChunksJson) as string[]
+    } else {
+      this.reasoningChunks = options.reasoningChunks ?? []
+    }
     this.chunkDelayMs = options.chunkDelayMs ?? DEFAULT_DELAY_MS
     this.errorAfterChunks = options.errorAfterChunks
     this.errorMessage = options.errorMessage ?? "Simulated provider error"
@@ -56,6 +66,32 @@ export class FakeLLMProvider implements LLMProvider {
 
   async *stream(_request: StreamRequest, signal?: AbortSignal): AsyncIterable<StreamChunk> {
     let emittedTextChunks = 0
+
+    // Emit reasoning (thinking) chunks first, before the answer — mirrors how
+    // reasoning models stream chain-of-thought before the final response.
+    for (const chunk of this.reasoningChunks) {
+      if (signal?.aborted) {
+        yield {
+          type: "finish",
+          finishReason: "abort",
+          usage: this.computeUsage(emittedTextChunks),
+        }
+        return
+      }
+
+      await this.sleepWithAbort(this.chunkDelayMs, signal)
+
+      if (signal?.aborted) {
+        yield {
+          type: "finish",
+          finishReason: "abort",
+          usage: this.computeUsage(emittedTextChunks),
+        }
+        return
+      }
+
+      yield { type: "reasoning-delta", reasoningDelta: chunk }
+    }
 
     for (const chunk of this.chunks) {
       // Check abort before each delay

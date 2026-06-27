@@ -42,6 +42,12 @@ export type TextDeltaChunk = {
   readonly textDelta: string
 }
 
+/** Reasoning model chain-of-thought, streamed separately from the answer (DeepSeek R1, o-series via compatible gateways). */
+export type ReasoningDeltaChunk = {
+  readonly type: "reasoning-delta"
+  readonly reasoningDelta: string
+}
+
 export type FinishChunk = {
   readonly type: "finish"
   readonly finishReason: "stop" | "length" | "error" | "abort"
@@ -54,7 +60,7 @@ export type ErrorChunk = {
   readonly code: string
 }
 
-export type StreamChunk = TextDeltaChunk | FinishChunk | ErrorChunk
+export type StreamChunk = TextDeltaChunk | ReasoningDeltaChunk | FinishChunk | ErrorChunk
 
 // ── Usage metadata ──────────────────────────────────────────────────────────
 

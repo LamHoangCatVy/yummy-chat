@@ -264,6 +264,94 @@ describe("chat streaming API", () => {
         true,
       )
     })
+
+    it("streams reasoning events before text events for reasoning models", async () => {
+      const reasoningChunks = JSON.stringify(["Let me think", " about this."])
+      const textChunks = JSON.stringify(["The answer", " is 42."])
+      process.env.FAKE_PROVIDER_CHUNKS_JSON = textChunks
+      process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON = reasoningChunks
+      try {
+        const app = createApp()
+        const res = await app.request("/api/v1/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookies },
+          body: JSON.stringify({
+            conversationId,
+            content: "what is the answer",
+            model: "fake-provider",
+          }),
+        })
+
+        expect(res.status).toBe(200)
+        const events = await parseSSEStream(res, 10000)
+
+        const reasoningEvents = events.filter((e) => e.event === "reasoning")
+        const textEvents = events.filter((e) => e.event === "text")
+        const finishEvents = events.filter((e) => e.event === "finish")
+
+        expect(reasoningEvents.length).toBeGreaterThanOrEqual(1)
+        expect(textEvents.length).toBeGreaterThanOrEqual(1)
+        expect(finishEvents.length).toBe(1)
+
+        const reasoning = reasoningEvents.map((e) => JSON.parse(e.data).reasoning).join("")
+        expect(reasoning).toBe("Let me think about this.")
+
+        const text = textEvents.map((e) => JSON.parse(e.data).text).join("")
+        expect(text).toBe("The answer is 42.")
+
+        const firstReasoningIdx = events.findIndex((e) => e.event === "reasoning")
+        const firstTextIdx = events.findIndex((e) => e.event === "text")
+        expect(firstReasoningIdx).toBeLessThan(firstTextIdx)
+      } finally {
+        process.env.FAKE_PROVIDER_CHUNKS_JSON = ""
+        process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON = ""
+      }
+    })
+
+    it("persists reasoningContent in assistant message metadata", async () => {
+      const reasoningChunks = JSON.stringify(["Thinking..."])
+      const textChunks = JSON.stringify(["Done."])
+      process.env.FAKE_PROVIDER_CHUNKS_JSON = textChunks
+      process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON = reasoningChunks
+      try {
+        const app = createApp()
+
+        const convRes = await app.request("/api/v1/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookies },
+          body: JSON.stringify({ title: "Reasoning Persist Test" }),
+        })
+        const { id: freshConvId } = (await convRes.json()).data
+
+        const streamRes = await app.request("/api/v1/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookies },
+          body: JSON.stringify({
+            conversationId: freshConvId,
+            content: "think then answer",
+            model: "fake-provider",
+          }),
+        })
+
+        await parseSSEStream(streamRes, 10000)
+
+        const msgRes = await app.request(`/api/v1/conversations/${freshConvId}/messages`, {
+          headers: { Cookie: cookies },
+        })
+        const msgBody = await msgRes.json()
+        const messages = msgBody.data.data
+
+        const assistantMsgs = messages.filter(
+          (m: { role: string; metadata?: Record<string, unknown> }) =>
+            m.role === "assistant" && typeof m.metadata?.reasoningContent === "string",
+        )
+        expect(assistantMsgs.length).toBeGreaterThanOrEqual(1)
+        expect(assistantMsgs[0]?.metadata?.reasoningContent).toBe("Thinking...")
+      } finally {
+        process.env.FAKE_PROVIDER_CHUNKS_JSON = ""
+        process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON = ""
+      }
+    })
   })
 
   describe("BYOK provider resolution", () => {

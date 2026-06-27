@@ -9,12 +9,16 @@ export function stripGeneratedJsonBlocks(text: string): string {
 }
 
 export function mapMessageListItemToChatMessage(m: MessageListItem): ChatMessage {
+  const reasoningContent =
+    typeof m.metadata?.reasoningContent === "string" ? m.metadata.reasoningContent : undefined
+
   const base: ChatMessage = {
     id: m.id,
     role: m.role === "system" ? "assistant" : (m.role as "user" | "assistant"),
     content: m.content,
     isStreaming: false,
     createdAt: m.createdAt,
+    ...(reasoningContent !== undefined ? { reasoningContent } : {}),
   }
 
   const filesFromMetadata = m.metadata?.files
