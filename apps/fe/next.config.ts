@@ -7,6 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  // The floating Next.js dev-tools launcher sits at the top-right corner and
+  // would block the globally-mounted theme toggle (also top-right) during
+  // development. Disable the on-screen dev indicator; build/runtime errors
+  // still surface in the overlay (per Next.js devIndicators docs).
+  devIndicators: false,
   async rewrites() {
     return [
       {
@@ -17,4 +22,5 @@ const nextConfig: NextConfig = {
   },
 }
 
+// biome-ignore lint/style/noDefaultExport: Next.js requires a default config export
 export default nextConfig

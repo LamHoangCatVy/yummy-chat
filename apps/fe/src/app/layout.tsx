@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/theme-toggle"
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import type { ReactNode } from "react"
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         />
       </head>
       <body className="bg-surface-primary text-text-primary font-geist antialiased">
+        <ThemeToggle />
         {children}
       </body>
     </html>

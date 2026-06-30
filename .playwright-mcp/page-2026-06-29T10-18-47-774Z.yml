@@ -1,0 +1,44 @@
+- generic [ref=e1]:
+  - button "Switch to light mode" [ref=e24]:
+    - img [ref=e3]
+  - alert [ref=e25]
+  - generic [ref=e26]:
+    - complementary [ref=e27]:
+      - generic [ref=e29]:
+        - button "Start new conversation" [ref=e31]:
+          - img [ref=e32]
+          - generic [ref=e35]: New chat
+        - generic [ref=e37]:
+          - button "Welcome conversation" [active] [ref=e38]:
+            - generic [ref=e39]: Welcome conversation
+          - button "Delete Welcome conversation" [ref=e40]:
+            - img [ref=e41]
+      - generic [ref=e45]:
+        - generic [ref=e46]: Test User One
+        - generic [ref=e47]:
+          - link "Settings" [ref=e48] [cursor=pointer]:
+            - /url: /settings/skills
+            - img [ref=e49]
+          - button "Sign out" [ref=e52]:
+            - img [ref=e53]
+    - main [ref=e56]:
+      - generic [ref=e58]:
+        - generic [ref=e85]:
+          - paragraph [ref=e89]: Welcome to yummy-chat! How can I help you today?
+          - generic [ref=e92]: Tell me about yourself.
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - textbox "Message input" [ref=e66]:
+              - /placeholder: Message yummy-chat
+            - generic [ref=e67]:
+              - generic [ref=e68]:
+                - button "Select skill" [ref=e70]:
+                  - img [ref=e71]
+                  - img [ref=e74]
+                - combobox "Model" [ref=e77]:
+                  - img [ref=e78]
+                  - generic [ref=e81]: Select model
+                  - img [ref=e82]
+              - button "Send message" [disabled]:
+                - img
+          - paragraph [ref=e84]: yummy-chat can make mistakes. Check important info.

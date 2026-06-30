@@ -1,0 +1,23 @@
+- generic [ref=e1]:
+  - button "Switch to dark mode" [active] [ref=e25]:
+    - img [ref=e26]
+  - main [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - heading "yummy-chat" [level=1] [ref=e12]
+        - paragraph [ref=e13]: Sign in to continue
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Email
+          - textbox "Email" [ref=e17]:
+            - /placeholder: you@example.com
+        - generic [ref=e18]:
+          - generic [ref=e19]: Password
+          - textbox "Password" [ref=e20]:
+            - /placeholder: Enter your password
+        - button "Sign in" [ref=e21]
+      - paragraph [ref=e22]:
+        - text: Don't have an account?
+        - link "Create one" [ref=e23] [cursor=pointer]:
+          - /url: /register
+  - alert [ref=e24]

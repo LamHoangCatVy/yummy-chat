@@ -1,6 +1,6 @@
 "use client"
 
-import { Brain, ChevronDown, Download, Sparkles, User } from "lucide-react"
+import { Brain, ChevronDown, Download } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -16,10 +16,9 @@ interface ChatTranscriptProps {
 /**
  * Renders the scrollable message list with streaming text append.
  *
- * ChatGPT-style message rows (no bubbles):
- * - Each message is a full-width row inside a centered max-w container.
- * - A small circular avatar sits to the left; the name sits above the text.
- * - User and assistant share the same layout — only the avatar/icon differs.
+ * Message rows without avatars or name labels:
+ * - User messages are right-aligned within the centered max-w container.
+ * - Assistant messages are full-width with justified text.
  * - Streaming state shows a blinking cursor appended to the text.
  */
 export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
@@ -81,7 +80,7 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
     <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[48rem] px-spacing-4 pb-spacing-6 pt-spacing-8">
         {messages.map((message) => (
-          <MessageRow key={message.id} message={message} userName={userName} />
+          <MessageRow key={message.id} message={message} />
         ))}
       </div>
     </div>
@@ -106,43 +105,45 @@ function EmptyState({ userName }: { readonly userName: string }) {
 
 function MessageRow({
   message,
-  userName,
 }: {
   readonly message: ChatMessage
-  readonly userName: string
 }) {
   const isUser = message.role === "user"
-  const label = isUser ? userName.split(" ")[0] || userName : "Assistant"
   const displayContent = isUser ? message.content : stripGeneratedJsonBlocks(message.content)
 
-  return (
-    <div className="mb-spacing-8 flex gap-spacing-4">
-      <Avatar isUser={isUser} />
-      <div className="min-w-0 flex-1">
-        <div className="text-[0.8125rem] font-semibold leading-[1.4] text-text-primary">
-          {label}
-        </div>
-        <div className="mt-spacing-1 text-[0.9375rem] leading-[1.7] text-text-primary">
-          {isUser ? (
+  if (isUser) {
+    return (
+      <div className="mb-spacing-8 flex justify-end">
+        <div className="max-w-[42rem]">
+          <div className="rounded-radius-xl bg-surface-tertiary px-spacing-4 py-spacing-3 text-right text-[0.9375rem] leading-[1.7] text-text-primary">
             <span className="whitespace-pre-wrap">{displayContent}</span>
-          ) : (
-            <>
-              {message.reasoningContent && (
-                <ThinkingPanel
-                  reasoning={message.reasoningContent}
-                  isStreaming={message.isStreaming}
-                />
-              )}
-              <AssistantMessageContent
-                content={displayContent}
-                isStreaming={message.isStreaming}
-                hasReasoning={!!message.reasoningContent}
-              />
-            </>
+          </div>
+          {message.files && message.files.length > 0 && (
+            <div className="mt-spacing-3 flex justify-end">
+              <FileDownloads files={message.files} />
+            </div>
           )}
-          {message.files && message.files.length > 0 && <FileDownloads files={message.files} />}
         </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="mb-spacing-8">
+      <div className="text-justify text-[0.9375rem] leading-[1.7] text-text-primary">
+        {message.reasoningContent && (
+          <ThinkingPanel
+            reasoning={message.reasoningContent}
+            isStreaming={message.isStreaming}
+          />
+        )}
+        <AssistantMessageContent
+          content={displayContent}
+          isStreaming={message.isStreaming}
+          hasReasoning={!!message.reasoningContent}
+        />
+      </div>
+      {message.files && message.files.length > 0 && <FileDownloads files={message.files} />}
     </div>
   )
 }
@@ -188,17 +189,6 @@ function FileDownloads({ files }: { readonly files: readonly FileAttachment[] })
           <span>{file.filename}</span>
         </a>
       ))}
-    </div>
-  )
-}
-
-function Avatar({ isUser }: { readonly isUser: boolean }) {
-  return (
-    <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-tertiary text-text-secondary"
-      aria-hidden="true"
-    >
-      {isUser ? <User size={15} /> : <Sparkles size={15} />}
     </div>
   )
 }
