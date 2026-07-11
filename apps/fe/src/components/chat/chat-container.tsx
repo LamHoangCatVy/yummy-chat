@@ -42,12 +42,10 @@ export function ChatContainer({ userName }: ChatContainerProps) {
     }
   }, [conversationId, clear, loadMessages, setDisableNewChat])
 
-  // Disable "New chat" when the active conversation has no messages
   useEffect(() => {
     setDisableNewChat(conversationId !== null && messages.length === 0)
   }, [conversationId, messages.length, setDisableNewChat])
 
-  // Generate title after first exchange completes
   useEffect(() => {
     if (
       status === "done" &&
@@ -84,8 +82,8 @@ export function ChatContainer({ userName }: ChatContainerProps) {
   )
 
   return (
-    <div className="flex h-full flex-col">
-      <ChatTranscript messages={messages} userName={userName} />
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <ChatTranscript messages={messages} userName={userName} onPromptSelect={handleSend} />
       <ChatComposer
         status={status}
         onSend={handleSend}
