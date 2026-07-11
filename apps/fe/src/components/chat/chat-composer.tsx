@@ -2,7 +2,7 @@
 
 import { ModelSelector } from "@/components/models/model-selector"
 import { SkillSelector } from "@/components/skills/skill-selector"
-import { ArrowUp, Square } from "lucide-react"
+import { ArrowUp, Sparkles, Square } from "lucide-react"
 import { useCallback, useRef, useState } from "react"
 import type { StreamStatus } from "./types"
 
@@ -18,16 +18,12 @@ interface ChatComposerProps {
   readonly onModelSelect: (modelId: string) => void
 }
 
-/**
- * Multi-line text input anchored to the bottom of the chat surface.
- *
- * ChatGPT-style composer:
- * - Rounded pill container with a subtle border, two-row layout.
- * - Textarea on top; skill selector (left) and send button (right) below.
- * - Send is a circular black button with an up-arrow; disabled state is muted.
- * - Stop button replaces send while streaming.
- * - Enter to send, Shift+Enter for newline.
- */
+const SHORTCUTS = [
+  "Summarize this into decisions and risks",
+  "Create acceptance criteria",
+  "Draw a system flow in Mermaid",
+] as const
+
 export function ChatComposer({
   status,
   onSend,
@@ -49,7 +45,6 @@ export function ChatComposer({
     if (!trimmed || isStreaming || disabled) return
     onSend(trimmed)
     setValue("")
-    // Reset textarea height after sending
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
@@ -65,65 +60,106 @@ export function ChatComposer({
     [handleSubmit],
   )
 
-  // Auto-resize textarea based on content (max 200px)
   const handleInput = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`
+  }, [])
+
+  const handleShortcut = useCallback((prompt: string) => {
+    setValue(prompt)
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.focus()
+      el.style.height = "auto"
+      el.style.height = `${Math.min(el.scrollHeight, 220)}px`
+    })
   }, [])
 
   return (
-    <div className="bg-surface-primary px-spacing-4 pb-spacing-4 pt-spacing-2">
-      <div className="mx-auto max-w-[48rem]">
-        <div className="flex flex-col rounded-[28px] border border-border-subtle bg-surface-primary px-spacing-4 py-spacing-3 transition-[border-color,box-shadow] duration-[150ms] focus-within:border-border-hover focus-within:shadow-[0_0_0_3px_var(--color-accent-ghost)]">
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value)
-              handleInput()
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Message yummy-chat"
-            disabled={disabled || isStreaming}
-            rows={1}
-            className="max-h-[200px] flex-1 resize-none appearance-none !border-0 bg-transparent text-[0.9375rem] leading-[1.6] text-text-primary !shadow-none !outline-none !ring-0 placeholder:text-text-tertiary focus:!border-0 focus:!shadow-none focus:!outline-none focus:!ring-0 focus-visible:!border-0 focus-visible:!shadow-none focus-visible:!outline-none focus-visible:!ring-0 disabled:opacity-40"
-            aria-label="Message input"
-          />
-          <div className="mt-spacing-2 flex items-center justify-between gap-spacing-2">
-            <div className="flex min-w-0 items-center gap-spacing-2">
-              <SkillSelector
-                conversationId={conversationId}
-                selectedSkillId={selectedSkillId}
-                onSelect={onSkillSelect}
+    <div className="shrink-0 px-spacing-4 pb-spacing-4 pt-spacing-2 md:px-spacing-8 md:pb-spacing-6">
+      <div className="mx-auto max-w-[58rem]">
+        <div className="mb-spacing-3 hidden flex-wrap gap-spacing-2 md:flex">
+          {SHORTCUTS.map((shortcut) => (
+            <button
+              key={shortcut}
+              type="button"
+              onClick={() => handleShortcut(shortcut)}
+              disabled={disabled || isStreaming}
+              className="rounded-full border border-border-subtle bg-surface-glass px-spacing-3 py-spacing-2 text-[0.75rem] font-semibold leading-[1.2] text-text-secondary shadow-[0_10px_24px_rgba(6,35,59,0.04)] backdrop-blur-xl transition-all duration-150 hover:-translate-y-[1px] hover:border-border-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {shortcut}
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-[28px] border border-border-subtle bg-surface-glass p-spacing-2 shadow-[0_24px_70px_rgba(6,35,59,0.14)] backdrop-blur-2xl transition-[border-color,box-shadow,transform] duration-150 focus-within:border-border-hover focus-within:shadow-[0_30px_90px_rgba(0,99,177,0.18)]">
+          <div className="rounded-[22px] bg-surface-raised/72 p-spacing-3">
+            <div className="flex items-start gap-spacing-3">
+              <div className="mt-spacing-1 hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand-mint text-brand-green sm:flex">
+                <Sparkles size={17} />
+              </div>
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(e) => {
+                  setValue(e.target.value)
+                  handleInput()
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask Yummy to analyze, reason, draft, compare, diagram, or plan..."
+                disabled={disabled || isStreaming}
+                rows={1}
+                className="max-h-[220px] min-h-[46px] flex-1 resize-none appearance-none !border-0 bg-transparent text-[0.98rem] leading-[1.65] text-text-primary !shadow-none !outline-none !ring-0 placeholder:text-text-tertiary focus:!border-0 focus:!shadow-none focus:!outline-none focus:!ring-0 focus-visible:!border-0 focus-visible:!shadow-none focus-visible:!outline-none focus-visible:!ring-0 disabled:opacity-40"
+                aria-label="Message input"
               />
-              <ModelSelector selectedModel={selectedModel} onSelect={onModelSelect} />
             </div>
-            {isStreaming ? (
-              <button
-                type="button"
-                onClick={onStop}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary text-text-inverse transition-[opacity,transform] duration-[100ms] ease-in-out hover:opacity-90 active:scale-[0.96]"
-                aria-label="Stop generating"
-              >
-                <Square size={14} fill="currentColor" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!canSend}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary text-text-inverse transition-[opacity,transform,background-color] duration-[100ms] ease-in-out hover:opacity-90 active:scale-[0.96] disabled:bg-surface-tertiary disabled:text-text-tertiary disabled:pointer-events-none"
-                aria-label="Send message"
-              >
-                <ArrowUp size={16} />
-              </button>
-            )}
+
+            <div className="mt-spacing-3 flex flex-col gap-spacing-3 border-t border-border-subtle pt-spacing-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-wrap items-center gap-spacing-2">
+                <SkillSelector
+                  conversationId={conversationId}
+                  selectedSkillId={selectedSkillId}
+                  onSelect={onSkillSelect}
+                />
+                <ModelSelector selectedModel={selectedModel} onSelect={onModelSelect} />
+                <span className="hidden rounded-full bg-brand-ice px-spacing-3 py-spacing-2 text-[0.72rem] font-semibold text-text-secondary lg:inline-flex">
+                  Shift + Enter for new line
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-spacing-3 sm:justify-end">
+                <span className="text-[0.72rem] font-medium leading-[1.3] text-text-tertiary">
+                  {isStreaming ? "Yummy is generating..." : "Ready"}
+                </span>
+                {isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={onStop}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-navy text-text-inverse shadow-[0_12px_28px_rgba(6,35,59,0.18)] transition-[opacity,transform] duration-100 ease-in-out hover:opacity-90 active:scale-[0.96]"
+                    aria-label="Stop generating"
+                  >
+                    <Square size={15} fill="currentColor" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!canSend}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-blue to-brand-green text-white shadow-[0_14px_30px_rgba(0,99,177,0.24)] transition-[opacity,transform,filter] duration-100 ease-in-out hover:brightness-105 active:scale-[0.96] disabled:pointer-events-none disabled:grayscale disabled:opacity-45"
+                    aria-label="Send message"
+                  >
+                    <ArrowUp size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <p className="mt-spacing-2 text-center text-[0.75rem] leading-[1.4] text-text-tertiary">
-          yummy-chat can make mistakes. Check important info.
+        <p className="mt-spacing-3 text-center text-[0.75rem] leading-[1.45] text-text-tertiary">
+          Yummy can make mistakes. Verify decisions, figures, policies, and production changes.
         </p>
       </div>
     </div>
