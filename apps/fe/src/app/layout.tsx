@@ -9,8 +9,8 @@ const geist = Geist({
 })
 
 export const metadata: Metadata = {
-  title: "yummy-chat",
-  description: "A focused command center for conversing with AI",
+  title: "Yummy Chat Workspace",
+  description: "A premium workspace for reasoning, planning, drafting, and reusing knowledge with Yummy.",
 }
 
 // Runs before paint to set the theme class from system preference / storage,

@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yummy Chat Prototype</title>
+  <style>
+    :root {
+      --navy: #092a53;
+      --navy-2: #0b3f78;
+      --blue: #0e6fd8;
+      --blue-soft: #e8f3ff;
+      --green: #16b364;
+      --green-soft: #e9f9f1;
+      --mint: #a8f0ce;
+      --red: #e5484d;
+      --ink: #0b1220;
+      --muted: #667085;
+      --muted-2: #98a2b3;
+      --line: rgba(9, 42, 83, 0.12);
+      --surface: #ffffff;
+      --surface-2: #f6f9fc;
+      --surface-3: #edf4fb;
+      --shadow: 0 24px 70px rgba(9, 42, 83, 0.16);
+      --shadow-soft: 0 12px 30px rgba(9, 42, 83, 0.10);
+      --radius-lg: 28px;
+      --radius-md: 20px;
+      --radius-sm: 14px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --ink: #edf5ff;
+      --muted: #b4c3d8;
+      --muted-2: #7d8ca3;
+      --line: rgba(255, 255, 255, 0.11);
+      --surface: #0c1728;
+      --surface-2: #08111f;
+      --surface-3: #12223a;
+      --blue-soft: rgba(14, 111, 216, 0.14);
+      --green-soft: rgba(22, 179, 100, 0.14);
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+      --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: var(--font);
+      background:
+        radial-gradient(circle at 16% 14%, rgba(14, 111, 216, 0.20), transparent 28%),
+        radial-gradient(circle at 86% 10%, rgba(22, 179, 100, 0.18), transparent 26%),
+        linear-gradient(135deg, #f7fbff 0%, #eef7f4 52%, #ffffff 100%);
+    }
+    [data-theme="dark"] body {
+      background:
+        radial-gradient(circle at 12% 10%, rgba(14, 111, 216, 0.28), transparent 31%),
+        radial-gradient(circle at 88% 8%, rgba(22, 179, 100, 0.20), transparent 28%),
+        linear-gradient(135deg, #06101d 0%, #081525 58%, #0b1320 100%);
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app-shell {
+      width: min(1560px, calc(100vw - 28px));
+      height: calc(100vh - 28px);
+      margin: 14px auto;
+      display: grid;
+      grid-template-columns: 292px minmax(0, 1fr) 350px;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: rgba(255, 255, 255, 0.72);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(24px);
+    }
+    [data-theme="dark"] .app-shell { background: rgba(7, 15, 27, 0.76); }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 22px;
+      border-right: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(9, 42, 83, 0.98), rgba(5, 26, 51, 0.96));
+      color: #fff;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #0e6fd8, #16b364);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+      font-weight: 900;
+    }
+    .brand strong { display: block; font-size: 17px; letter-spacing: -0.03em; }
+    .brand span { display: block; margin-top: 2px; color: rgba(255,255,255,0.62); font-size: 12px; }
+
+    .nav-card {
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 22px;
+      background: rgba(255,255,255,0.08);
+    }
+    .primary-action {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 13px 14px;
+      border: 0;
+      border-radius: 16px;
+      color: #052344;
+      background: linear-gradient(135deg, #ffffff, #dff4ff 55%, #d9fae8);
+      font-weight: 800;
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+    }
+    .nav-list { display: grid; gap: 7px; margin-top: 16px; }
+    .nav-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px 12px;
+      border: 1px solid transparent;
+      border-radius: 15px;
+      color: rgba(255,255,255,0.72);
+      background: transparent;
+      text-align: left;
+      transition: 0.18s ease;
+    }
+    .nav-item:hover, .nav-item.active {
+      color: #fff;
+      border-color: rgba(255,255,255,0.13);
+      background: rgba(255,255,255,0.10);
+      transform: translateX(2px);
+    }
+    .nav-icon {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.10);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      background: rgba(0,0,0,0.16);
+    }
+    .search-box input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: #fff;
+      background: transparent;
+      font-size: 13px;
+    }
+    .search-box input::placeholder { color: rgba(255,255,255,0.48); }
+
+    .conversation-stack { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; gap: 9px; padding-right: 2px; }
+    .section-label { margin: 2px 0 4px; color: rgba(255,255,255,0.46); font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+    .conversation {
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 17px;
+      background: rgba(255,255,255,0.065);
+      transition: 0.18s ease;
+    }
+    .conversation:hover, .conversation.active { background: rgba(255,255,255,0.13); transform: translateY(-1px); }
+    .conversation strong { display: block; font-size: 13px; line-height: 1.3; }
+    .conversation span { display: block; margin-top: 5px; color: rgba(255,255,255,0.48); font-size: 12px; }
+
+    .user-mini {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 20px;
+      background: rgba(0,0,0,0.14);
+    }
+    .avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: #fff; color: var(--navy); font-weight: 900; }
+    .user-mini strong { display: block; font-size: 13px; }
+    .user-mini span { color: rgba(255,255,255,0.5); font-size: 12px; }
+
+    .main {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      background: linear-gradient(180deg, rgba(255,255,255,0.40), rgba(255,255,255,0.22));
+    }
+    [data-theme="dark"] .main { background: linear-gradient(180deg, rgba(13, 28, 49, 0.56), rgba(7, 15, 27, 0.26)); }
+    .topbar {
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .title-block h1 { margin: 0; font-size: 18px; letter-spacing: -0.03em; }
+    .title-block p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      background: rgba(255,255,255,0.58);
+      font-size: 12px;
+      font-weight: 750;
+    }
+    [data-theme="dark"] .pill { background: rgba(255,255,255,0.06); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(22,179,100,0.12); }
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: var(--ink);
+      background: rgba(255,255,255,0.62);
+    }
+    [data-theme="dark"] .icon-button { background: rgba(255,255,255,0.06); }
+
+    .content { flex: 1; min-height: 0; overflow: auto; padding: 22px; }
+    .screen { display: none; animation: enter 0.22s ease; }
+    .screen.active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .hero-card, .panel-card, .message-card, .work-card, .metric-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(255,255,255,0.76);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(18px);
+    }
+    [data-theme="dark"] .hero-card, [data-theme="dark"] .panel-card, [data-theme="dark"] .message-card, [data-theme="dark"] .work-card, [data-theme="dark"] .metric-card { background: rgba(13, 28, 49, 0.72); }
+    .hero-card { position: relative; overflow: hidden; padding: 28px; }
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      right: -72px;
+      top: -72px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(22,179,100,0.28), transparent 66%);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid rgba(14,111,216,0.16);
+      border-radius: 999px;
+      color: var(--blue);
+      background: var(--blue-soft);
+      font-size: 12px;
+      font-weight: 850;
+    }
+    .hero h2 { max-width: 720px; margin: 18px 0 10px; font-size: clamp(34px, 5vw, 58px); line-height: 0.96; letter-spacing: -0.075em; }
+    .hero p { max-width: 640px; margin: 0; color: var(--muted); line-height: 1.65; font-size: 15px; }
+    .hero-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 24px; }
+    .hero-stat { padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,0.48); }
+    [data-theme="dark"] .hero-stat { background: rgba(255,255,255,0.05); }
+    .hero-stat strong { display: block; font-size: 20px; letter-spacing: -0.04em; }
+    .hero-stat span { color: var(--muted); font-size: 12px; }
+
+    .prompt-matrix { display: grid; gap: 12px; }
+    .prompt-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,255,255,0.72);
+      text-align: left;
+      transition: 0.18s ease;
+    }
+    [data-theme="dark"] .prompt-card { background: rgba(255,255,255,0.05); }
+    .prompt-card:hover { transform: translateY(-2px); border-color: rgba(14,111,216,0.34); box-shadow: var(--shadow-soft); }
+    .prompt-card small { display: block; color: var(--green); font-weight: 850; text-transform: uppercase; letter-spacing: 0.1em; }
+    .prompt-card strong { display: block; margin-top: 6px; font-size: 14px; }
+    .prompt-card span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .chat-flow { display: grid; gap: 14px; }
+    .message-card { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 18px; border-radius: 24px; box-shadow: none; }
+    .message-card.user { margin-left: 8%; background: linear-gradient(135deg, rgba(14,111,216,0.10), rgba(22,179,100,0.08)); }
+    .message-card.assistant { margin-right: 4%; }
+    .message-avatar { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--blue), var(--green)); font-weight: 900; }
+    .message-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .message-head strong { font-size: 13px; }
+    .message-head span { color: var(--muted-2); font-size: 12px; }
+    .message-body { color: var(--ink); font-size: 14px; line-height: 1.65; }
+    .message-body ul { margin: 10px 0 0; padding-left: 18px; }
+    .message-body li { margin: 4px 0; }
+
+    .composer {
+      padding: 14px 22px 22px;
+      border-top: 1px solid var(--line);
+      background: linear-gradient(180deg, transparent, rgba(255,255,255,0.48));
+    }
+    [data-theme="dark"] .composer { background: linear-gradient(180deg, transparent, rgba(7,15,27,0.48)); }
+    .composer-box {
+      border: 1px solid rgba(14,111,216,0.16);
+      border-radius: 26px;
+      background: rgba(255,255,255,0.82);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+    [data-theme="dark"] .composer-box { background: rgba(13,28,49,0.82); }
+    .quick-row { display: flex; gap: 8px; padding: 12px 13px 0; overflow-x: auto; }
+    .quick-chip {
+      white-space: nowrap;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 10px;
+      color: var(--muted);
+      background: transparent;
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .quick-chip:hover { color: var(--blue); background: var(--blue-soft); }
+    .composer-main { display: flex; gap: 12px; align-items: end; padding: 12px; }
+    .composer-main textarea {
+      flex: 1;
+      min-height: 56px;
+      max-height: 140px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      line-height: 1.55;
+    }
+    .composer-main textarea::placeholder { color: var(--muted-2); }
+    .send-btn {
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 18px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      box-shadow: 0 14px 28px rgba(14,111,216,0.28);
+      font-weight: 900;
+    }
+
+    .right-panel {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 14px;
+      padding: 22px;
+      border-left: 1px solid var(--line);
+      background: rgba(255,255,255,0.44);
+      overflow: auto;
+    }
+    [data-theme="dark"] .right-panel { background: rgba(7,15,27,0.28); }
+    .panel-card { padding: 18px; border-radius: 24px; box-shadow: none; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .panel-head strong { font-size: 14px; letter-spacing: -0.02em; }
+    .panel-head small { color: var(--muted); }
+    .source { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+    .source:first-of-type { border-top: 0; padding-top: 0; }
+    .source-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; background: var(--blue-soft); color: var(--blue); font-weight: 900; font-size: 12px; }
+    .source strong { display: block; font-size: 12px; }
+    .source span { color: var(--muted); font-size: 11px; }
+    .progress-list { display: grid; gap: 10px; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+    .step-no { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 10px; color: #fff; background: var(--navy); font-size: 12px; font-weight: 900; }
+    .step strong { display: block; font-size: 12px; }
+    .step span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .work-card, .metric-card { padding: 18px; border-radius: 24px; box-shadow: none; }
+    .work-card h3, .metric-card h3 { margin: 0; font-size: 16px; letter-spacing: -0.03em; }
+    .work-card p, .metric-card p { color: var(--muted); line-height: 1.55; font-size: 13px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+    .tag { padding: 6px 9px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-size: 11px; font-weight: 800; }
+    .tag.green { background: var(--green-soft); color: var(--green); }
+    .bar { height: 10px; margin-top: 16px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+    .bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--green)); }
+
+    .table-card { overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+    td { color: var(--ink); }
+    .status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 850; }
+    .status.blue { background: var(--blue-soft); color: var(--blue); }
+
+    .floating-note {
+      position: fixed;
+      right: 28px;
+      bottom: 28px;
+      display: none;
+      max-width: 330px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      color: var(--ink);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+      font-size: 13px;
+      line-height: 1.45;
+      z-index: 30;
+    }
+    .floating-note.show { display: block; animation: enter 0.18s ease; }
+
+    @media (max-width: 1240px) {
+      .app-shell { grid-template-columns: 256px minmax(0, 1fr); }
+      .right-panel { display: none; }
+      .hero { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 840px) {
+      body { overflow: auto; }
+      .app-shell { width: 100%; height: auto; min-height: 100vh; margin: 0; border-radius: 0; grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .topbar { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,0.82); backdrop-filter: blur(18px); }
+      [data-theme="dark"] .topbar { background: rgba(7,15,27,0.84); }
+      .content { min-height: 70vh; }
+      .grid-3, .grid-2, .hero-grid { grid-template-columns: 1fr; }
+      .message-card.user { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">Y</div>
+        <div>
+          <strong>Yummy Chat</strong>
+          <span>Knowledge workbench</span>
+        </div>
+      </div>
+
+      <div class="nav-card">
+        <button class="primary-action" data-screen-target="chat"><span>New intelligent session</span><span>+</span></button>
+        <div class="nav-list">
+          <button class="nav-item active" data-screen-target="chat"><span class="nav-icon">C</span><span>Chat Workspace</span></button>
+          <button class="nav-item" data-screen-target="workkits"><span class="nav-icon">W</span><span>Role Workkits</span></button>
+          <button class="nav-item" data-screen-target="knowledge"><span class="nav-icon">K</span><span>Knowledge Hub</span></button>
+          <button class="nav-item" data-screen-target="admin"><span class="nav-icon">A</span><span>Admin Console</span></button>
+          <button class="nav-item" data-screen-target="analytics"><span class="nav-icon">R</span><span>Reports</span></button>
+        </div>
+        <div class="search-box"><span>⌕</span><input id="conversationSearch" placeholder="Search sessions" /></div>
+      </div>
+
+      <div class="conversation-stack" id="conversationList">
+        <div class="section-label">Recent work</div>
+        <div class="conversation active" data-name="OCB reverse engineering"><strong>OCB reverse engineering</strong><span>Service dictionary, business rules</span></div>
+        <div class="conversation" data-name="Innovation Hub scoring"><strong>Innovation Hub scoring</strong><span>Idea intake, ranking, HITL</span></div>
+        <div class="conversation" data-name="BA story writing"><strong>BA story writing</strong><span>Epic, story, AC, risk</span></div>
+        <div class="conversation" data-name="Test strategy assistant"><strong>Test strategy assistant</strong><span>QA plan and regression scope</span></div>
+        <div class="conversation" data-name="Policy search bot"><strong>Policy search bot</strong><span>Search, cite, explain policy</span></div>
+      </div>
+
+      <div class="user-mini">
+        <div class="avatar">K</div>
+        <div>
+          <strong>Kathy</strong>
+          <span>Product Owner workspace</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="title-block">
+          <h1 id="screenTitle">Chat Workspace</h1>
+          <p id="screenSubtitle">Ask, analyze, document, and turn knowledge into reusable work output.</p>
+        </div>
+        <div class="top-actions">
+          <span class="pill"><i class="dot"></i> Secure workspace</span>
+          <span class="pill">Claude 3.5 Sonnet</span>
+          <button class="icon-button" id="themeToggle" title="Toggle theme">◐</button>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="screen active" id="screen-chat">
+          <div class="hero">
+            <div class="hero-card">
+              <span class="badge"><i class="dot"></i> Enterprise AI workspace prototype</span>
+              <h2>Turn messy work into clear decisions, documents, and delivery assets.</h2>
+              <p>Yummy Chat is positioned as a knowledge operating layer for non-technical roles: BA, SA, PO, PM, QA and business teams. The UI focuses on grounded answers, reusable workkits, governed sources, and fast handoff into execution.</p>
+              <div class="hero-grid">
+                <div class="hero-stat"><strong>85%+</strong><span>target answer confidence</span></div>
+                <div class="hero-stat"><strong>4 roles</strong><span>BA, SA, PO, QA</span></div>
+                <div class="hero-stat"><strong>1 place</strong><span>chat, source, output</span></div>
+              </div>
+            </div>
+            <div class="prompt-matrix">
+              <button class="prompt-card" data-prompt="Analyze this business requirement and turn it into user stories, acceptance criteria, risks and open questions."><small>BA Workkit</small><strong>Requirement to user stories</strong><span>Generate story map, AC, edge cases and questions.</span></button>
+              <button class="prompt-card" data-prompt="Reverse engineer this module and explain the business flow, validation rules, data dependencies and integration points."><small>SA Workkit</small><strong>Reverse engineering brief</strong><span>Explain legacy flow in business language.</span></button>
+              <button class="prompt-card" data-prompt="Create a product decision memo with context, options, trade-offs, recommendation, risks and implementation plan."><small>PO Workkit</small><strong>Decision memo</strong><span>Prepare a crisp decision document for stakeholders.</span></button>
+              <button class="prompt-card" data-prompt="Design a test strategy including scope, regression areas, test data, entry criteria, exit criteria and defect triage rules."><small>QA Workkit</small><strong>Test strategy</strong><span>Convert product changes into test coverage.</span></button>
+            </div>
+          </div>
+
+          <div class="chat-flow" id="chatFlow">
+            <article class="message-card user">
+              <div class="message-avatar">K</div>
+              <div>
+                <div class="message-head"><strong>Kathy</strong><span>09:41</span></div>
+                <div class="message-body">I need to understand the international transfer module from a legacy codebase and prepare documentation for business, SA and QA.</div>
+              </div>
+            </article>
+            <article class="message-card assistant">
+              <div class="message-avatar">Y</div>
+              <div>
+                <div class="message-head"><strong>Yummy Assistant</strong><span>Grounded answer</span></div>
+                <div class="message-body">Recommended output structure:
+                  <ul>
+                    <li><strong>Business flow:</strong> actor, trigger, step, exception and outcome.</li>
+                    <li><strong>Rule dictionary:</strong> validation rules, limits, fees, country constraints and approval matrix.</li>
+                    <li><strong>System map:</strong> APIs, database tables, upstream and downstream dependencies.</li>
+                    <li><strong>QA pack:</strong> test scenarios, test data, negative cases and regression checklist.</li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="screen" id="screen-workkits">
+          <div class="grid-3">
+            <article class="work-card"><h3>Business Analyst</h3><p>Convert notes, BRD fragments and business discussions into user stories, acceptance criteria, process maps, scope boundaries and open-question logs.</p><div class="tag-row"><span class="tag">User story</span><span class="tag green">AC</span><span class="tag">BPMN brief</span></div></article>
+            <article class="work-card"><h3>System Analyst</h3><p>Map business intent into API contracts, integration points, sequence flows, data dependencies, validations and technical impact assessment.</p><div class="tag-row"><span class="tag">API map</span><span class="tag green">Rule dictionary</span><span class="tag">Impact</span></div></article>
+            <article class="work-card"><h3>Product Owner</h3><p>Prepare decision memos, product strategy, roadmap trade-offs, prioritization scoring and stakeholder-ready business cases.</p><div class="tag-row"><span class="tag">Decision memo</span><span class="tag green">Roadmap</span><span class="tag">RICE</span></div></article>
+            <article class="work-card"><h3>QA Analyst</h3><p>Generate test strategy, test matrix, regression scope, negative scenarios, UAT checklist and defect triage suggestions.</p><div class="tag-row"><span class="tag">Test plan</span><span class="tag green">Regression</span><span class="tag">UAT</span></div></article>
+            <article class="work-card"><h3>Project Manager</h3><p>Turn scope and constraints into milestones, dependency plans, RAID logs, weekly status reports and escalation summaries.</p><div class="tag-row"><span class="tag">RAID</span><span class="tag green">Timeline</span><span class="tag">Status</span></div></article>
+            <article class="work-card"><h3>Operations</h3><p>Standardize runbooks, support scripts, service checklists, incident summaries and operating handover documents.</p><div class="tag-row"><span class="tag">Runbook</span><span class="tag green">SOP</span><span class="tag">Incident</span></div></article>
+          </div>
+        </div>
+
+        <div class="screen" id="screen-knowledge">
+          <div class="grid-2">
+            <article class="work-card"><h3>Source ingestion</h3><p>Documents, code repositories, Confluence pages, Jira tickets and policy files are organized into governed collections with ownership and refresh cadence.</p><div class="bar"><i style="width: 78%"></i></div></article>
+            <article class="work-card"><h3>Grounding quality</h3><p>Every answer is designed to show source lineage, confidence, unresolved assumptions and what still needs human verification.</p><div class="bar"><i style="width: 86%"></i></div></article>
+          </div>
+          <div class="panel-card table-card" style="margin-top:16px;padding:0">
+            <table>
+              <thead><tr><th>Knowledge set</th><th>Owner</th><th>Refresh</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>OCB legacy modules</td><td>SA Team</td><td>On git diff</td><td><span class="status">Active</span></td></tr>
+                <tr><td>Innovation Hub BRD</td><td>Product</td><td>Weekly</td><td><span class="status blue">Review</span></td></tr>
+                <tr><td>QA regression pack</td><td>QA Lead</td><td>Per release</td><td><span class="status">Active</span></td></tr>
+                <tr><td>Internal policies</td><td>Operations</td><td>Monthly</td><td><span class="status blue">Draft</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="screen" id="screen-admin">
+          <div class="grid-3">
+            <article class="metric-card"><h3>Model routing</h3><p>Control which model supports each workkit, including fallback behavior and reasoning mode.</p><div class="bar"><i style="width: 72%"></i></div></article>
+            <article class="metric-card"><h3>Permission groups</h3><p>Assign source access by department, role and project so sensitive knowledge stays controlled.</p><div class="bar"><i style="width: 64%"></i></div></article>
+            <article class="metric-card"><h3>Prompt governance</h3><p>Version reusable prompts, review risky instructions and publish approved templates.</p><div class="bar"><i style="width: 81%"></i></div></article>
+          </div>
+          <div class="panel-card table-card" style="margin-top:16px;padding:0">
+            <table>
+              <thead><tr><th>Configuration</th><th>Scope</th><th>Owner</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>BA Workkit prompts</td><td>All business units</td><td>Product Ops</td><td><span class="status">Published</span></td></tr>
+                <tr><td>Code reverse engineering source</td><td>OCB</td><td>SA Team</td><td><span class="status blue">Controlled</span></td></tr>
+                <tr><td>Audit log retention</td><td>Workspace</td><td>Admin</td><td><span class="status">Enabled</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="screen" id="screen-analytics">
+          <div class="grid-3">
+            <article class="metric-card"><h3>12.8k</h3><p>Messages processed this month across role-based workkits.</p><div class="bar"><i style="width: 84%"></i></div></article>
+            <article class="metric-card"><h3>41%</h3><p>Estimated reduction in documentation preparation time for repeat workflows.</p><div class="bar"><i style="width: 41%"></i></div></article>
+            <article class="metric-card"><h3>92%</h3><p>Sessions using governed source collections instead of free-form answers.</p><div class="bar"><i style="width: 92%"></i></div></article>
+          </div>
+          <div class="grid-2" style="margin-top:16px">
+            <article class="work-card"><h3>Most used workflows</h3><p>Requirement analysis, reverse engineering brief, QA test matrix, decision memo and policy explanation.</p></article>
+            <article class="work-card"><h3>Improvement opportunities</h3><p>Add source freshness warnings, better citation coverage, reviewer workflow and template approval analytics.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer">
+        <div class="composer-box">
+          <div class="quick-row">
+            <button class="quick-chip" data-prompt="Summarize this requirement into scope, assumptions, risks and next actions.">Scope summary</button>
+            <button class="quick-chip" data-prompt="Create user stories with acceptance criteria and edge cases.">Create stories</button>
+            <button class="quick-chip" data-prompt="Map the business flow, APIs, validations and dependencies.">System map</button>
+            <button class="quick-chip" data-prompt="Generate a QA regression checklist for this change.">QA checklist</button>
+          </div>
+          <div class="composer-main">
+            <textarea id="messageInput" placeholder="Ask Yummy to analyze a requirement, reverse a module, draft a memo or prepare a QA plan..."></textarea>
+            <button class="send-btn" id="sendButton">↑</button>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <aside class="right-panel">
+      <div class="panel-card">
+        <div class="panel-head"><strong>Active workkit</strong><small>PO / BA</small></div>
+        <div class="source"><div class="source-icon">BRD</div><div><strong>Requirement analysis</strong><span>Story, AC, risks, open questions</span></div></div>
+        <div class="source"><div class="source-icon">SA</div><div><strong>System impact</strong><span>APIs, DB, dependencies</span></div></div>
+        <div class="source"><div class="source-icon">QA</div><div><strong>Test coverage</strong><span>Positive, negative, regression</span></div></div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-head"><strong>Grounded sources</strong><small>4 attached</small></div>
+        <div class="source"><div class="source-icon">01</div><div><strong>OCB module dictionary</strong><span>Updated from latest code diff</span></div></div>
+        <div class="source"><div class="source-icon">02</div><div><strong>Innovation Hub BRD</strong><span>Business context and scoring flow</span></div></div>
+        <div class="source"><div class="source-icon">03</div><div><strong>QA regression pack</strong><span>Reusable test assets</span></div></div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-head"><strong>Recommended process</strong><small>5 steps</small></div>
+        <div class="progress-list">
+          <div class="step"><div class="step-no">1</div><div><strong>Clarify intent</strong><span>Identify role, output format and decision context.</span></div></div>
+          <div class="step"><div class="step-no">2</div><div><strong>Attach sources</strong><span>Select documents, tickets, code or policies.</span></div></div>
+          <div class="step"><div class="step-no">3</div><div><strong>Generate output</strong><span>Use a governed workkit template.</span></div></div>
+          <div class="step"><div class="step-no">4</div><div><strong>Review gaps</strong><span>Check assumptions, risks and missing evidence.</span></div></div>
+          <div class="step"><div class="step-no">5</div><div><strong>Handoff</strong><span>Export to Jira, Confluence, Word or email.</span></div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="floating-note" id="toast">Prototype action completed.</div>
+
+  <script>
+    const titles = {
+      chat: ["Chat Workspace", "Ask, analyze, document, and turn knowledge into reusable work output."],
+      workkits: ["Role Workkits", "Reusable workflows for BA, SA, PO, QA, PM and Operations."],
+      knowledge: ["Knowledge Hub", "Governed source collections with ownership, freshness and confidence controls."],
+      admin: ["Admin Console", "Configure models, access, prompts, audit controls and workspace governance."],
+      analytics: ["Reports", "Track usage, quality, adoption and productivity impact across teams."]
+    };
+
+    const navItems = document.querySelectorAll("[data-screen-target]");
+    const screens = document.querySelectorAll(".screen");
+    const screenTitle = document.getElementById("screenTitle");
+    const screenSubtitle = document.getElementById("screenSubtitle");
+    const toast = document.getElementById("toast");
+    const input = document.getElementById("messageInput");
+    const chatFlow = document.getElementById("chatFlow");
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function openScreen(name) {
+      screens.forEach(screen => screen.classList.toggle("active", screen.id === `screen-${name}`));
+      document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.screenTarget === name));
+      const copy = titles[name] || titles.chat;
+      screenTitle.textContent = copy[0];
+      screenSubtitle.textContent = copy[1];
+    }
+
+    navItems.forEach(item => {
+      item.addEventListener("click", () => {
+        openScreen(item.dataset.screenTarget);
+        if (item.classList.contains("primary-action")) showToast("New intelligent session opened.");
+      });
+    });
+
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === "dark" ? "light" : "dark";
+      showToast(`Theme switched to ${html.dataset.theme} mode.`);
+    });
+
+    function setPrompt(text) {
+      input.value = text;
+      input.focus();
+      openScreen("chat");
+    }
+
+    document.querySelectorAll("[data-prompt]").forEach(button => {
+      button.addEventListener("click", () => setPrompt(button.dataset.prompt));
+    });
+
+    function addMessage(role, body) {
+      const article = document.createElement("article");
+      article.className = `message-card ${role}`;
+      const avatar = role === "user" ? "K" : "Y";
+      const label = role === "user" ? "Kathy" : "Yummy Assistant";
+      const time = role === "user" ? new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "Prototype response";
+      article.innerHTML = `<div class="message-avatar">${avatar}</div><div><div class="message-head"><strong>${label}</strong><span>${time}</span></div><div class="message-body">${body}</div></div>`;
+      chatFlow.appendChild(article);
+      article.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    document.getElementById("sendButton").addEventListener("click", () => {
+      const text = input.value.trim();
+      if (!text) return showToast("Type a message or choose a quick prompt first.");
+      addMessage("user", text.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+      input.value = "";
+      window.setTimeout(() => {
+        addMessage("assistant", "I would structure this into four reusable outputs: <ul><li><strong>Context:</strong> what problem is being solved and who owns it.</li><li><strong>Flow:</strong> actors, trigger, happy path, exceptions and handoff points.</li><li><strong>Rules:</strong> validations, data dependencies, decisions and constraints.</li><li><strong>Delivery:</strong> user stories, QA checklist, risks and next actions.</li></ul>");
+      }, 450);
+    });
+
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        document.getElementById("sendButton").click();
+      }
+    });
+
+    document.getElementById("conversationSearch").addEventListener("input", event => {
+      const value = event.target.value.toLowerCase();
+      document.querySelectorAll(".conversation").forEach(item => {
+        item.style.display = item.dataset.name.toLowerCase().includes(value) ? "block" : "none";
+      });
+    });
+
+    document.querySelectorAll(".conversation").forEach(item => {
+      item.addEventListener("click", () => {
+        document.querySelectorAll(".conversation").forEach(c => c.classList.remove("active"));
+        item.classList.add("active");
+        openScreen("chat");
+        showToast(`${item.dataset.name} selected.`);
+      });
+    });
+  </script>
+</body>
+</html>
