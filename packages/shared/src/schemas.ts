@@ -156,6 +156,131 @@ export const advancedSettingsPutInputSchema = z.object({
   endpoint: z.string().url().optional(),
 })
 
+const mcpUrlSchema = z.string().trim().url().max(2_000)
+const mcpValueSchema = z.string().max(20_000)
+
+export const mcpNamedValueSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(256),
+  secret: z.boolean(),
+  value: z.string().optional(),
+  hasValue: z.boolean(),
+})
+
+export const mcpArgumentSchema = z.object({
+  id: z.string().uuid(),
+  secret: z.boolean(),
+  value: z.string().optional(),
+  hasValue: z.boolean(),
+})
+
+export const mcpNamedValueInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1).max(256),
+  secret: z.boolean().default(false),
+  value: mcpValueSchema.nullable().optional(),
+})
+
+export const mcpArgumentInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  secret: z.boolean().default(false),
+  value: mcpValueSchema.nullable().optional(),
+})
+
+export const mcpConnectionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("remote_oauth"),
+    url: mcpUrlSchema,
+    grantType: z.enum(["authorization_code", "client_credentials"]),
+    scopes: z.array(z.string().trim().min(1).max(256)).max(50),
+    registrationMode: z.enum(["dynamic", "manual"]),
+    clientId: z.string().max(2_000).nullable(),
+    hasClientSecret: z.boolean(),
+    authorizationStatus: z.enum(["required", "ready"]),
+  }),
+  z.object({
+    type: z.literal("remote_custom"),
+    url: mcpUrlSchema,
+    headers: z.array(mcpNamedValueSchema).max(100),
+    query: z.array(mcpNamedValueSchema).max(100),
+  }),
+  z.object({
+    type: z.literal("local_stdio"),
+    command: z.string().min(1).max(2_000),
+    args: z.array(mcpArgumentSchema).max(200),
+    env: z.array(mcpNamedValueSchema).max(100),
+    cwd: z.string().max(4_000).nullable(),
+  }),
+])
+
+export const mcpConnectionInputSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("remote_oauth"),
+    url: mcpUrlSchema,
+    grantType: z.enum(["authorization_code", "client_credentials"]),
+    scopes: z.array(z.string().trim().min(1).max(256)).max(50).default([]),
+    registrationMode: z.enum(["dynamic", "manual"]).default("dynamic"),
+    clientId: z.string().trim().min(1).max(2_000).nullable().optional(),
+    clientSecret: mcpValueSchema.nullable().optional(),
+  }),
+  z.object({
+    type: z.literal("remote_custom"),
+    url: mcpUrlSchema,
+    headers: z.array(mcpNamedValueInputSchema).max(100).default([]),
+    query: z.array(mcpNamedValueInputSchema).max(100).default([]),
+  }),
+  z.object({
+    type: z.literal("local_stdio"),
+    command: z.string().trim().min(1).max(2_000),
+    args: z.array(mcpArgumentInputSchema).max(200).default([]),
+    env: z.array(mcpNamedValueInputSchema).max(100).default([]),
+    cwd: z.string().trim().max(4_000).nullable().optional(),
+  }),
+])
+
+export const mcpServerSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  connection: mcpConnectionSchema,
+  enabled: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+})
+
+export const mcpServerListResponseSchema = z.object({
+  servers: z.array(mcpServerSchema),
+  capabilities: z.object({ localStdioEnabled: z.boolean() }),
+})
+
+export const mcpServerCreateInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  connection: mcpConnectionInputSchema,
+  enabled: z.boolean().default(true),
+})
+
+export const mcpServerUpdateInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    connection: mcpConnectionInputSchema.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required")
+
+export const mcpOauthStartResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+})
+
+export const mcpToolSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable(),
+  inputSchema: z.record(z.string(), z.unknown()),
+})
+
+export const mcpToolListResponseSchema = z.object({
+  server: mcpServerSchema,
+  tools: z.array(mcpToolSchema),
+})
+
 export const healthResponseSchema = z.object({
   status: z.enum(["ok", "degraded", "error"]),
   version: z.string(),
@@ -219,6 +344,19 @@ export type ModelItem = z.infer<typeof modelItemSchema>
 export type ModelListResponse = z.infer<typeof modelListResponseSchema>
 export type AdvancedSettingsGetResponse = z.infer<typeof advancedSettingsGetResponseSchema>
 export type AdvancedSettingsPutInput = z.infer<typeof advancedSettingsPutInputSchema>
+export type McpServer = z.infer<typeof mcpServerSchema>
+export type McpServerListResponse = z.infer<typeof mcpServerListResponseSchema>
+export type McpServerCreateInput = z.infer<typeof mcpServerCreateInputSchema>
+export type McpServerUpdateInput = z.infer<typeof mcpServerUpdateInputSchema>
+export type McpConnection = z.infer<typeof mcpConnectionSchema>
+export type McpConnectionInput = z.infer<typeof mcpConnectionInputSchema>
+export type McpNamedValue = z.infer<typeof mcpNamedValueSchema>
+export type McpNamedValueInput = z.infer<typeof mcpNamedValueInputSchema>
+export type McpArgument = z.infer<typeof mcpArgumentSchema>
+export type McpArgumentInput = z.infer<typeof mcpArgumentInputSchema>
+export type McpOauthStartResponse = z.infer<typeof mcpOauthStartResponseSchema>
+export type McpTool = z.infer<typeof mcpToolSchema>
+export type McpToolListResponse = z.infer<typeof mcpToolListResponseSchema>
 export type HealthResponse = z.infer<typeof healthResponseSchema>
 export type FileAttachment = z.infer<typeof fileAttachmentSchema>
 export type PptxSlideData = z.infer<typeof pptxSlideSchema>

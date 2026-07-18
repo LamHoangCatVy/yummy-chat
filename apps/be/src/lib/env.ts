@@ -44,6 +44,9 @@ export const env = {
       .split(",")
       .map((s) => s.trim())
   },
+  get mcpLocalCommandsEnabled(): boolean {
+    return process.env.MCP_ALLOW_LOCAL_COMMANDS === "true"
+  },
 } as const
 
 export type Env = typeof env

@@ -14,6 +14,8 @@ import type { Actor } from "../authz.js"
 import type {
   LLMProvider,
   ProviderMessage,
+  ProviderTool,
+  ProviderToolExecutor,
   StreamChunk,
   StreamRequest,
   UsageMetadata,
@@ -61,12 +63,14 @@ export interface OrchestrateMetadata {
 export interface OrchestratorDeps {
   readonly provider: LLMProvider
   readonly tokenBudget?: number
+  readonly tools?: readonly ProviderTool[]
+  readonly executeTool?: ProviderToolExecutor
 }
 
 // ── Orchestrator ────────────────────────────────────────────────────────────
 
 export function createOrchestrator(deps: OrchestratorDeps) {
-  const { provider, tokenBudget = DEFAULT_TOKEN_BUDGET } = deps
+  const { provider, tokenBudget = DEFAULT_TOKEN_BUDGET, tools, executeTool } = deps
 
   return {
     async orchestrate(
@@ -119,6 +123,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         messages,
         model: request.model,
         systemPrompt,
+        ...(tools?.length ? { tools } : {}),
+        ...(tools?.length && executeTool ? { executeTool } : {}),
       }
 
       // 7. Estimate input tokens

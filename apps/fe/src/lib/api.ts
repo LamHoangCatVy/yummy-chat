@@ -10,6 +10,12 @@ import type {
   CreateMemoryInput,
   CreateSkillInput,
   HealthResponse,
+  McpOauthStartResponse,
+  McpServer,
+  McpServerCreateInput,
+  McpServerListResponse,
+  McpServerUpdateInput,
+  McpToolListResponse,
   MemoryEntry,
   MemoryListResponse,
   MemorySettings,
@@ -27,6 +33,10 @@ import {
   conversationListResponseSchema,
   conversationSchema,
   healthResponseSchema,
+  mcpOauthStartResponseSchema,
+  mcpServerListResponseSchema,
+  mcpServerSchema,
+  mcpToolListResponseSchema,
   memoryEntrySchema,
   memoryListResponseSchema,
   memorySettingsSchema,
@@ -228,6 +238,46 @@ export function fetchModels(): Promise<ModelListResponse> {
   return fetchApi(API_V1.MODELS, { schema: modelListResponseSchema })
 }
 
+// ── MCP servers ─────────────────────────────────────────────────────────────
+
+export function listMcpServers(): Promise<McpServerListResponse> {
+  return fetchApi(API_V1.MCP, { schema: mcpServerListResponseSchema })
+}
+
+export function createMcpServer(input: McpServerCreateInput): Promise<McpServer> {
+  return fetchApi(API_V1.MCP, { method: "POST", body: input, schema: mcpServerSchema })
+}
+
+export function updateMcpServer(id: string, input: McpServerUpdateInput): Promise<McpServer> {
+  return fetchApi(`${API_V1.MCP}/${id}`, {
+    method: "PATCH",
+    body: input,
+    schema: mcpServerSchema,
+  })
+}
+
+export function deleteMcpServer(id: string) {
+  return fetchApi(`${API_V1.MCP}/${id}`, { method: "DELETE" })
+}
+
+export function listMcpTools(id: string): Promise<McpToolListResponse> {
+  return fetchApi(`${API_V1.MCP}/${id}/tools`, { schema: mcpToolListResponseSchema })
+}
+
+export function startMcpOauth(id: string): Promise<McpOauthStartResponse> {
+  return fetchApi(`${API_V1.MCP}/${id}/oauth/start`, {
+    method: "POST",
+    schema: mcpOauthStartResponseSchema,
+  })
+}
+
+export function disconnectMcpOauth(id: string): Promise<McpServer> {
+  return fetchApi(`${API_V1.MCP}/${id}/oauth/disconnect`, {
+    method: "POST",
+    schema: mcpServerSchema,
+  })
+}
+
 export interface MessageListItem {
   readonly id: string
   readonly role: "system" | "user" | "assistant"
@@ -309,4 +359,10 @@ export type {
   UpdateMemoryInput,
   MemorySettings,
   ModelListResponse,
+  McpServer,
+  McpServerCreateInput,
+  McpServerListResponse,
+  McpServerUpdateInput,
+  McpOauthStartResponse,
+  McpToolListResponse,
 }

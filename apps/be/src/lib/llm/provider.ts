@@ -18,7 +18,25 @@ export interface StreamRequest {
   readonly messages: readonly ProviderMessage[]
   readonly model: string
   readonly systemPrompt?: string
+  readonly tools?: readonly ProviderTool[]
+  readonly executeTool?: ProviderToolExecutor
 }
+
+export interface ProviderTool {
+  readonly name: string
+  readonly description: string
+  readonly inputSchema: Record<string, unknown>
+}
+
+export interface ProviderToolResult {
+  readonly content: string
+  readonly isError?: boolean
+}
+
+export type ProviderToolExecutor = (
+  name: string,
+  arguments_: Record<string, unknown>,
+) => Promise<ProviderToolResult>
 
 // ── Complete (non-streaming) request / response ─────────────────────────────
 
@@ -60,7 +78,27 @@ export type ErrorChunk = {
   readonly code: string
 }
 
-export type StreamChunk = TextDeltaChunk | ReasoningDeltaChunk | FinishChunk | ErrorChunk
+export type ToolCallChunk = {
+  readonly type: "tool-call"
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly arguments: Record<string, unknown>
+}
+
+export type ToolResultChunk = {
+  readonly type: "tool-result"
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly isError: boolean
+}
+
+export type StreamChunk =
+  | TextDeltaChunk
+  | ReasoningDeltaChunk
+  | FinishChunk
+  | ErrorChunk
+  | ToolCallChunk
+  | ToolResultChunk
 
 // ── Usage metadata ──────────────────────────────────────────────────────────
 

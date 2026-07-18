@@ -1,0 +1,14 @@
+## Wave 0 characterization notes
+
+- Current shared settings contracts are single-provider: GET parses `{ hasApiKey, endpoint, selectedModel }`; PUT accepts optional `apiKey` and optional URL `endpoint` only.
+- Current model-listing contract exposes `{ models: [{ id, label? }] }` to FE while BE parses OpenAI-compatible provider responses shaped as `{ data: [{ id, label? }] }`.
+- Current `/models` behavior is BYOK-gated: users with no encrypted API key, including endpoint-only settings, receive `{ models: [] }` and no provider fetch occurs.
+- Settings PUT invalidates the per-user model cache, so the next `/models` GET refetches provider models.
+- FE characterization now pins advanced settings PUT bodies to only provided `{ apiKey, endpoint }`, flat model lists consumed as `{ models: [{ id, label? }] }`, model selector first-model auto-selection, title generation POST `{ model }`, chat stream POST default `model: "gpt-5-nano"`, and custom SSE `text`/`reasoning`/`finishReason`/`filename`+`downloadUrl` handling in `apps/fe/tests/api-contract.test.ts`.
+- BE chat characterization now pins custom SSE event names/payloads for `text`, `reasoning`, `finish`, and `error`; fake-provider fallback remains deterministic; BYOK invalid-key errors do not fall back to fake text and redact `sk-` key material.
+- BE title characterization now pins `/conversations/:id/generate-title` auth/validation behavior and verifies the route sends non-streaming completion requests with the requested `model`.
+- Wave 1 shared contracts added strict provider schemas for provider kinds (`openai`, `anthropic`, `google`, `openai-compatible`), provider summary/detail responses, provider CRUD/default inputs, and provider-aware model list responses while leaving legacy advanced settings/model-list schemas unchanged.
+- Shared chat request schema now keeps `model` required and accepts optional `providerId`; title-generation has no shared schema yet, so the future contract is documented in `packages/shared/src/schemas.ts` until that route input is promoted.
+- DB persistence now has `ai_providers` alongside legacy `user_api_settings`; migration `0004_add_provider_settings.sql` backfills one default `openai-compatible` provider per legacy row with an API key or endpoint, and repository default changes clear sibling providers transactionally.
+- Settings routes now use `aiProviderRepository` for `/advanced`: GET projects provider details plus legacy fields from the default/first provider; legacy PUT upserts the default provider; provider CRUD/default routes invalidate the models cache and never return key material.
+- Model listing now resolves an explicit `providerId` or the user's default `ai_providers` row; native providers return server-side catalogs, while `openai-compatible` providers keep the authenticated `/models` fetch with cache keys scoped by user, provider, and endpoint.

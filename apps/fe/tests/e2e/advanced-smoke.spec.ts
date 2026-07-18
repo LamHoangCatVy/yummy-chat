@@ -1,8 +1,25 @@
 import { expect, test } from "@playwright/test"
+import type { Page } from "@playwright/test"
 
 const TEST_USER = {
   email: "e2e@test.com",
   password: "password123",
+}
+
+type SettingsSection = "mcp" | "skills" | "memory" | "advanced"
+
+async function openSettings(page: Page, section: SettingsSection = "skills") {
+  if (section === "mcp") {
+    await page.getByRole("button", { name: "MCP servers and tools" }).click()
+  } else {
+    await page.getByRole("button", { name: "Settings" }).click()
+    if (section !== "skills") {
+      await page.getByRole("button", { name: section, exact: true }).click()
+    }
+  }
+
+  await expect(page).toHaveURL(new RegExp(`/chat\\?settings=${section}`), { timeout: 10_000 })
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible({ timeout: 10_000 })
 }
 
 test.describe("Advanced smoke: skills + memory", () => {
@@ -17,9 +34,8 @@ test.describe("Advanced smoke: skills + memory", () => {
   test("create skill → select in chat → verify skill used", async ({ page }) => {
     const skillName = `E2E Skill ${Date.now()}`
 
-    // ── Step 1: Navigate to skills settings ──────────────────────────────────
-    await page.goto("/settings/skills")
-    await expect(page).toHaveURL(/\/settings\/skills/, { timeout: 10_000 })
+    // ── Step 1: Open skills settings ─────────────────────────────────────────
+    await openSettings(page)
     await expect(page.getByRole("heading", { name: /skills/i })).toBeVisible({ timeout: 10_000 })
 
     // ── Step 2: Create a new skill ───────────────────────────────────────────
@@ -34,8 +50,8 @@ test.describe("Advanced smoke: skills + memory", () => {
     // ── Step 3: Verify skill appears in the list ─────────────────────────────
     await expect(page.getByText(skillName)).toBeVisible({ timeout: 10_000 })
 
-    // ── Step 4: Go to chat and select the skill ──────────────────────────────
-    await page.goto("/chat")
+    // ── Step 4: Close settings and select the skill in chat ─────────────────
+    await page.getByRole("button", { name: "Close settings" }).click()
     await expect(page).toHaveURL(/\/chat/, { timeout: 10_000 })
 
     // Create a new conversation
@@ -66,7 +82,7 @@ test.describe("Advanced smoke: skills + memory", () => {
     await expect(page.getByText("Hello with skill")).toBeVisible({ timeout: 10_000 })
 
     // ── Step 6: Clean up — delete the skill ──────────────────────────────────
-    await page.goto("/settings/skills")
+    await openSettings(page)
     await expect(page.getByText(skillName)).toBeVisible({ timeout: 10_000 })
 
     const deleteButton = page.getByRole("button", { name: new RegExp(`delete ${skillName}`, "i") })
@@ -75,9 +91,8 @@ test.describe("Advanced smoke: skills + memory", () => {
   })
 
   test("create memory → verify memory → disable memory → verify disabled", async ({ page }) => {
-    // ── Step 1: Navigate to memory settings ──────────────────────────────────
-    await page.goto("/settings/memory")
-    await expect(page).toHaveURL(/\/settings\/memory/, { timeout: 10_000 })
+    // ── Step 1: Open memory settings ─────────────────────────────────────────
+    await openSettings(page, "memory")
     await expect(page.getByRole("heading", { name: /memory/i })).toBeVisible({ timeout: 10_000 })
 
     // ── Step 2: Enable memory if disabled ─────────────────────────────────────
@@ -123,7 +138,7 @@ test.describe("Advanced smoke: skills + memory", () => {
     // User 2 goes to login page (not authenticated as a different user)
     // Since we only have one test user, we verify that the skills API
     // returns only the test user's skills
-    await page1.goto("/settings/skills")
+    await openSettings(page1)
     await expect(page1.getByRole("heading", { name: /skills/i })).toBeVisible({ timeout: 10_000 })
 
     // Verify the skills page loads and shows the user's skills
@@ -137,21 +152,70 @@ test.describe("Advanced smoke: skills + memory", () => {
     await context2.close()
   })
 
-  test("settings navigation: sidebar links work", async ({ page }) => {
-    // Navigate to skills settings
-    await page.goto("/settings/skills")
-    await expect(page).toHaveURL(/\/settings\/skills/, { timeout: 10_000 })
+  test("settings modal: shortcuts, navigation, and browser history work", async ({ page }) => {
+    // Open skills settings from the user footer
+    await openSettings(page)
     await expect(page.getByRole("heading", { name: /skills/i })).toBeVisible({ timeout: 10_000 })
 
-    // Navigate to memory settings via nav
-    await page.getByRole("link", { name: /memory/i }).click()
-    await expect(page).toHaveURL(/\/settings\/memory/, { timeout: 10_000 })
+    // Navigate to memory settings inside the modal
+    await page.getByRole("button", { name: "Memory", exact: true }).click()
+    await expect(page).toHaveURL(/\/chat\?settings=memory/, { timeout: 10_000 })
     await expect(page.getByRole("heading", { name: /memory/i })).toBeVisible({ timeout: 10_000 })
 
-    // Navigate back to skills settings via nav
-    await page.getByRole("link", { name: /skills/i }).click()
-    await expect(page).toHaveURL(/\/settings\/skills/, { timeout: 10_000 })
-    await expect(page.getByRole("heading", { name: /skills/i })).toBeVisible({ timeout: 10_000 })
+    // Browser Back closes the modal and restores the chat surface
+    await page.goBack()
+    await expect(page).toHaveURL(/\/chat$/, { timeout: 10_000 })
+    await expect(page.getByRole("dialog", { name: "Settings" })).toBeHidden()
+
+    // The dedicated MCP shortcut opens the MCP section
+    await openSettings(page, "mcp")
+    await expect(page.getByRole("heading", { name: "MCP" })).toBeVisible({ timeout: 10_000 })
+
+    // Escape dismisses the native dialog
+    await page.keyboard.press("Escape")
+    await expect(page).toHaveURL(/\/chat$/, { timeout: 10_000 })
+    await expect(page.getByRole("button", { name: "MCP servers and tools" })).toBeFocused()
+  })
+
+  test("MCP settings expose the three structured connection modes", async ({ page }) => {
+    await openSettings(page, "mcp")
+    await page.getByRole("button", { name: "Add server" }).click()
+
+    const type = page.getByLabel("Connection type")
+    await expect(type).toHaveValue("remote_custom")
+    await expect(type.locator('option[value="remote_oauth"]')).toHaveText("Remote with OAuth")
+    await expect(type.locator('option[value="local_stdio"]')).toBeDisabled()
+
+    await page
+      .getByRole("group", { name: "Headers" })
+      .getByRole("button", { name: "+ Add" })
+      .click()
+    await expect(page.getByLabel("Headers name")).toBeVisible()
+    await expect(page.getByLabel("Headers value")).toBeVisible()
+
+    await type.selectOption("remote_oauth")
+    await expect(page.getByLabel("OAuth grant")).toBeVisible()
+    await expect(page.getByLabel("Client registration")).toBeVisible()
+
+    await page.getByRole("button", { name: "Cancel" }).click()
+  })
+
+  test("legacy settings URLs redirect to the matching chat modal", async ({ page }) => {
+    const routes = [
+      ["/settings", "skills"],
+      ["/settings/mcp", "mcp"],
+      ["/settings/skills", "skills"],
+      ["/settings/memory", "memory"],
+      ["/settings/advanced", "advanced"],
+    ] as const
+
+    for (const [route, section] of routes) {
+      await page.goto(route)
+      await expect(page).toHaveURL(new RegExp(`/chat\\?settings=${section}`), {
+        timeout: 10_000,
+      })
+      await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible()
+    }
   })
 
   test("unauthenticated user is redirected from settings to login", async ({ page }) => {
@@ -176,9 +240,8 @@ test.describe("Advanced smoke: BYOK flow", () => {
   })
 
   test("BYOK advanced settings and model selection flow", async ({ page }) => {
-    // ── Step 1: Navigate to advanced settings ──────────────────────────────
-    await page.goto("/settings/advanced")
-    await expect(page).toHaveURL(/\/settings\/advanced/, { timeout: 10_000 })
+    // ── Step 1: Open advanced settings ─────────────────────────────────────
+    await openSettings(page, "advanced")
     await expect(page.getByRole("heading", { name: /advanced/i })).toBeVisible({ timeout: 10_000 })
 
     // ── Step 2: Verify key form elements are present ────────────────────────
@@ -198,8 +261,8 @@ test.describe("Advanced smoke: BYOK flow", () => {
     // ── Step 5: Verify success message ─────────────────────────────────────
     await expect(page.getByText("Settings saved")).toBeVisible({ timeout: 10_000 })
 
-    // ── Step 6: Navigate to chat ───────────────────────────────────────────
-    await page.goto("/chat")
+    // ── Step 6: Close settings ─────────────────────────────────────────────
+    await page.getByRole("button", { name: "Close settings" }).click()
     await expect(page).toHaveURL(/\/chat/, { timeout: 10_000 })
 
     // ── Step 7: Verify model dropdown is visible in composer ────────────────

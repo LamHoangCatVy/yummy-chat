@@ -124,4 +124,6 @@ Key variables:
 - `DATABASE_URL` — Postgres connection string
 - `BETTER_AUTH_SECRET` — Auth encryption secret
 - `LLM_PROVIDER_API_KEY` — API key for LLM provider (optional)
+- `MCP_ALLOW_PRIVATE_NETWORKS` — allow MCP endpoints on localhost/private networks (default: false)
+- `MCP_ALLOW_LOCAL_COMMANDS` — allow authenticated users to run local stdio MCP servers as the backend OS account (default: false)
 - `APP_ENV` — Current environment (`development`, `staging`, `production`)

@@ -36,6 +36,20 @@
       "when": 1781912000000,
       "tag": "0004_add_generated_chat_file",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784192400000,
+      "tag": "0005_add_mcp_servers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784206800000,
+      "tag": "0006_expand_mcp_connections",
+      "breakpoints": true
     }
   ]
 }

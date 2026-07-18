@@ -16,6 +16,7 @@ import { extractPptxJson, generatePptxBuffer } from "../lib/llm/pptx-generator.j
 import type { LLMProvider } from "../lib/llm/provider.js"
 import type { UsageMetadata } from "../lib/llm/provider.js"
 import { extractXlsxJson, generateXlsxBuffer } from "../lib/llm/xlsx-generator.js"
+import { createMcpToolSet } from "../lib/mcp/client.js"
 import { redactString } from "../lib/redact.js"
 import {
   conversationRepository,
@@ -198,7 +199,12 @@ chatRouter.post("/stream", async (c) => {
 
   // Create orchestrator and run
   const provider = await resolveProviderForUser(user.id)
-  const orchestrator = createOrchestrator({ provider })
+  const mcpToolSet = await createMcpToolSet(actor.userId)
+  const orchestrator = createOrchestrator({
+    provider,
+    tools: mcpToolSet.tools,
+    executeTool: mcpToolSet.execute,
+  })
 
   let assistantMsgId: MessageId | null = null
   let accumulatedText = ""
@@ -293,6 +299,28 @@ chatRouter.post("/stream", async (c) => {
               })
               break
             }
+            case "tool-call": {
+              await stream.writeSSE({
+                event: "tool-call",
+                data: JSON.stringify({
+                  toolCallId: chunk.toolCallId,
+                  toolName: chunk.toolName,
+                  arguments: chunk.arguments,
+                }),
+              })
+              break
+            }
+            case "tool-result": {
+              await stream.writeSSE({
+                event: "tool-result",
+                data: JSON.stringify({
+                  toolCallId: chunk.toolCallId,
+                  toolName: chunk.toolName,
+                  isError: chunk.isError,
+                }),
+              })
+              break
+            }
           }
         }
       } catch (err) {
@@ -302,6 +330,7 @@ chatRouter.post("/stream", async (c) => {
           data: JSON.stringify({ error: redactString(errorMsg), code: "STREAM_ERROR" }),
         })
       } finally {
+        await mcpToolSet.close()
         // Persist generated files and update the placeholder message
         if (assistantMsgId) {
           const fileRepo = generatedFileRepository(actor)
@@ -429,6 +458,7 @@ chatRouter.post("/stream", async (c) => {
       }
     })
   } catch (err) {
+    await mcpToolSet.close()
     const errorMsg = err instanceof Error ? err.message : "Orchestration failed"
 
     emitAuditEvent({

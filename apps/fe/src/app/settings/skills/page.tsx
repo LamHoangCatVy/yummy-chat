@@ -1,9 +1,6 @@
-import { SkillsManager } from "@/components/skills/skills-manager"
-import { requireSession } from "@/lib/auth-server"
+import { redirect } from "next/navigation"
 
 // biome-ignore lint/style/noDefaultExport: Next.js App Router requires default export for page
-export default async function SkillsSettingsPage() {
-  await requireSession()
-
-  return <SkillsManager />
+export default function SkillsSettingsPage() {
+  redirect("/chat?settings=skills")
 }

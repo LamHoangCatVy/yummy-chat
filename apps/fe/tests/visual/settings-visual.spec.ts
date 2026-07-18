@@ -9,41 +9,17 @@ async function loginAsTestUser(page: import("@playwright/test").Page): Promise<v
 }
 
 test.describe("Settings pages visual regression", () => {
-  test("settings page matches snapshot", async ({ page }) => {
-    await loginAsTestUser(page)
-    await page.goto("/settings")
-    await page.waitForLoadState("networkidle")
-    await test.expect(page).toHaveScreenshot("settings-page.png", {
-      maxDiffPixelRatio: 0.01,
+  for (const section of ["mcp", "skills", "memory", "advanced"] as const) {
+    test(`${section} settings modal matches snapshot`, async ({ page }) => {
+      await loginAsTestUser(page)
+      await page.goto(`/chat?settings=${section}`)
+      await page.getByRole("dialog", { name: "Settings" }).waitFor({ state: "visible" })
+      await page.waitForLoadState("networkidle")
+      await test.expect(page).toHaveScreenshot(`settings-modal-${section}.png`, {
+        maxDiffPixelRatio: 0.01,
+      })
     })
-  })
-
-  test("skills settings matches snapshot", async ({ page }) => {
-    await loginAsTestUser(page)
-    await page.goto("/settings/skills")
-    await page.waitForLoadState("networkidle")
-    await test.expect(page).toHaveScreenshot("settings-skills.png", {
-      maxDiffPixelRatio: 0.01,
-    })
-  })
-
-  test("memory settings matches snapshot", async ({ page }) => {
-    await loginAsTestUser(page)
-    await page.goto("/settings/memory")
-    await page.waitForLoadState("networkidle")
-    await test.expect(page).toHaveScreenshot("settings-memory.png", {
-      maxDiffPixelRatio: 0.01,
-    })
-  })
-
-  test("advanced settings matches snapshot", async ({ page }) => {
-    await loginAsTestUser(page)
-    await page.goto("/settings/advanced")
-    await page.waitForLoadState("networkidle")
-    await test.expect(page).toHaveScreenshot("settings-advanced.png", {
-      maxDiffPixelRatio: 0.01,
-    })
-  })
+  }
 
   test("chat composer with model dropdown matches snapshot", async ({ page }) => {
     await loginAsTestUser(page)

@@ -1,12 +1,26 @@
 "use client"
 
+import type { SettingsSection } from "@/components/settings/settings-modal"
 import { ConversationProvider, useConversation } from "@/components/sidebar/conversation-context"
 import { ConversationList } from "@/components/sidebar/conversation-list"
 import { signOut } from "@/lib/auth-client"
-import { LogOut, Menu, Settings } from "lucide-react"
-import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { LogOut, Menu, Plug, Settings } from "lucide-react"
+import dynamic from "next/dynamic"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
+
+const SettingsModal = dynamic(() =>
+  import("@/components/settings/settings-modal").then((module) => module.SettingsModal),
+)
+
+const SETTINGS_SECTIONS = new Set<SettingsSection>(["mcp", "skills", "memory", "advanced"])
+
+function parseSettingsSection(value: string | null): SettingsSection | null {
+  return value && SETTINGS_SECTIONS.has(value as SettingsSection)
+    ? (value as SettingsSection)
+    : null
+}
 
 interface ChatSidebarClientProps {
   readonly children: ReactNode
@@ -35,7 +49,41 @@ function ChatSidebarInner({
   userName,
 }: { readonly children: ReactNode; readonly userName: string }) {
   const { activeId, setActiveId } = useConversation()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const modalOpenedFromChatRef = useRef(false)
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const rawSettingsSection = searchParams.get("settings")
+  const settingsSection = parseSettingsSection(rawSettingsSection)
+
+  const settingsUrl = useCallback(
+    (section: SettingsSection | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (section) {
+        params.set("settings", section)
+      } else {
+        params.delete("settings")
+      }
+      const query = params.toString()
+      return query ? `/chat?${query}` : "/chat"
+    },
+    [searchParams],
+  )
+
+  useEffect(() => {
+    if (rawSettingsSection && !settingsSection) {
+      router.replace(settingsUrl(null), { scroll: false })
+    }
+  }, [rawSettingsSection, router, settingsSection, settingsUrl])
+
+  useEffect(() => {
+    if (!settingsSection && settingsTriggerRef.current) {
+      const trigger = settingsTriggerRef.current
+      settingsTriggerRef.current = null
+      requestAnimationFrame(() => trigger.focus())
+    }
+  }, [settingsSection])
 
   // Close mobile menu on resize to desktop
   useEffect(() => {
@@ -91,11 +139,38 @@ function ChatSidebarInner({
     window.location.href = "/login"
   }, [])
 
+  const handleOpenSettings = useCallback(
+    (section: SettingsSection, trigger: HTMLButtonElement) => {
+      settingsTriggerRef.current = trigger
+      modalOpenedFromChatRef.current = true
+      setIsMobileMenuOpen(false)
+      router.push(settingsUrl(section), { scroll: false })
+    },
+    [router, settingsUrl],
+  )
+
+  const handleChangeSettingsSection = useCallback(
+    (section: SettingsSection) => {
+      router.replace(settingsUrl(section), { scroll: false })
+    },
+    [router, settingsUrl],
+  )
+
+  const handleCloseSettings = useCallback(() => {
+    if (modalOpenedFromChatRef.current) {
+      modalOpenedFromChatRef.current = false
+      router.back()
+      return
+    }
+    router.replace(settingsUrl(null), { scroll: false })
+  }, [router, settingsUrl])
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden w-[260px] shrink-0 flex-col md:flex">
         <div className="flex min-h-0 flex-1 flex-col">
+          <McpSidebarButton onOpenSettings={handleOpenSettings} />
           <ConversationList
             activeId={activeId}
             onSelect={handleSelectConversation}
@@ -103,7 +178,11 @@ function ChatSidebarInner({
             onDelete={handleDeleteConversation}
           />
         </div>
-        <UserFooter userName={userName} onSignOut={handleSignOut} />
+        <UserFooter
+          userName={userName}
+          onOpenSettings={handleOpenSettings}
+          onSignOut={handleSignOut}
+        />
       </aside>
 
       {/* Mobile overlay + drawer */}
@@ -123,6 +202,7 @@ function ChatSidebarInner({
           {/* Drawer */}
           <aside className="fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col md:hidden">
             <div className="flex min-h-0 flex-1 flex-col">
+              <McpSidebarButton onOpenSettings={handleOpenSettings} />
               <ConversationList
                 activeId={activeId}
                 onSelect={handleSelectConversation}
@@ -132,7 +212,11 @@ function ChatSidebarInner({
                 onCloseMobile={() => setIsMobileMenuOpen(false)}
               />
             </div>
-            <UserFooter userName={userName} onSignOut={handleSignOut} />
+            <UserFooter
+              userName={userName}
+              onOpenSettings={handleOpenSettings}
+              onSignOut={handleSignOut}
+            />
           </aside>
         </>
       )}
@@ -157,15 +241,45 @@ function ChatSidebarInner({
         {/* Chat content */}
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </main>
+
+      {settingsSection && (
+        <SettingsModal
+          section={settingsSection}
+          onSectionChange={handleChangeSettingsSection}
+          onClose={handleCloseSettings}
+        />
+      )}
+    </div>
+  )
+}
+
+function McpSidebarButton({
+  onOpenSettings,
+}: {
+  readonly onOpenSettings: (section: SettingsSection, trigger: HTMLButtonElement) => void
+}) {
+  return (
+    <div className="shrink-0 bg-surface-secondary px-spacing-3 pt-spacing-3">
+      <button
+        type="button"
+        onClick={(event) => onOpenSettings("mcp", event.currentTarget)}
+        className="flex w-full items-center gap-spacing-2 rounded-radius-md px-spacing-3 py-spacing-2 text-[0.8125rem] font-medium leading-[1.5] text-text-primary transition-colors duration-[150ms] hover:bg-surface-tertiary"
+        aria-label="MCP servers and tools"
+      >
+        <Plug size={16} />
+        <span>MCP</span>
+      </button>
     </div>
   )
 }
 
 function UserFooter({
   userName,
+  onOpenSettings,
   onSignOut,
 }: {
   readonly userName: string
+  readonly onOpenSettings: (section: SettingsSection, trigger: HTMLButtonElement) => void
   readonly onSignOut: () => void
 }) {
   return (
@@ -175,13 +289,14 @@ function UserFooter({
           {userName}
         </span>
         <div className="flex shrink-0 items-center gap-spacing-half">
-          <Link
-            href="/settings/skills"
+          <button
+            type="button"
+            onClick={(event) => onOpenSettings("skills", event.currentTarget)}
             className="flex h-7 w-7 items-center justify-center rounded-radius-sm text-text-tertiary transition-colors duration-[150ms] hover:bg-surface-tertiary hover:text-text-primary"
             aria-label="Settings"
           >
             <Settings size={15} />
-          </Link>
+          </button>
           <button
             type="button"
             onClick={onSignOut}

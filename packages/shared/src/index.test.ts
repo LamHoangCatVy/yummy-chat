@@ -9,6 +9,8 @@ import {
   conversationSchema,
   createConversationInputSchema,
   healthResponseSchema,
+  mcpServerCreateInputSchema,
+  mcpServerSchema,
   memoryEntrySchema,
   messageIdSchema,
   modelItemSchema,
@@ -23,6 +25,60 @@ const UUID = "550e8400-e29b-41d4-a716-446655440000"
 const UUID2 = "660e8400-e29b-41d4-a716-446655440000"
 const UUID3 = "770e8400-e29b-41d4-a716-446655440000"
 const NOW = new Date().toISOString()
+
+describe("MCP connection schemas", () => {
+  it("accepts each supported connection input", () => {
+    for (const connection of [
+      {
+        type: "remote_oauth",
+        url: "https://mcp.example.com/mcp",
+        grantType: "authorization_code",
+        registrationMode: "dynamic",
+        scopes: ["tools.read"],
+      },
+      {
+        type: "remote_custom",
+        url: "https://mcp.example.com/mcp",
+        headers: [{ name: "Authorization", value: "Bearer token", secret: true }],
+        query: [{ name: "tenant", value: "acme", secret: false }],
+      },
+      {
+        type: "local_stdio",
+        command: "npx",
+        args: [{ value: "-y", secret: false }],
+        env: [{ name: "API_KEY", value: "secret", secret: true }],
+        cwd: "/workspace",
+      },
+    ]) {
+      expect(mcpServerCreateInputSchema.parse({ name: "Tools", connection }).connection.type).toBe(
+        connection.type,
+      )
+    }
+  })
+
+  it("requires the response shape to mask secret values explicitly", () => {
+    const response = {
+      id: UUID,
+      name: "Tools",
+      enabled: true,
+      connection: {
+        type: "remote_custom",
+        url: "https://mcp.example.com/mcp",
+        headers: [{ id: UUID2, name: "Authorization", secret: true, hasValue: true }],
+        query: [],
+      },
+      createdAt: NOW,
+      updatedAt: NOW,
+    }
+    expect(mcpServerSchema.parse(response).connection.type).toBe("remote_custom")
+    expect(() =>
+      mcpServerSchema.parse({
+        ...response,
+        connection: { ...response.connection, headers: [{ name: "Authorization" }] },
+      }),
+    ).toThrow()
+  })
+})
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled value: ${String(value)}`)
@@ -467,6 +523,7 @@ describe("API_V1 routes", () => {
       "CONVERSATIONS",
       "FILES",
       "HEALTH",
+      "MCP",
       "MEMORY",
       "MODELS",
       "SETTINGS",
@@ -484,6 +541,7 @@ describe("API_V1 routes", () => {
     expect(API_V1.MODELS).toBe("/api/v1/models")
     expect(API_V1.HEALTH).toBe("/api/v1/health")
     expect(API_V1.FILES).toBe("/api/v1/files")
+    expect(API_V1.MCP).toBe("/api/v1/mcp")
   })
 })
 

@@ -8,4 +8,5 @@ export const API_V1 = {
   MODELS: "/api/v1/models",
   HEALTH: "/api/v1/health",
   FILES: "/api/v1/files",
+  MCP: "/api/v1/mcp",
 } as const

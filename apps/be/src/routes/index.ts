@@ -10,6 +10,7 @@ import { conversationsRouter } from "./conversations.js"
 import { filesRouter } from "./files.js"
 import { generateTitleRouter } from "./generate-title.js"
 import { healthRouter } from "./health.js"
+import { mcpRouter } from "./mcp.js"
 import { memoryRouter } from "./memory.js"
 import { messagesRouter } from "./messages.js"
 import { modelsRouter } from "./models.js"
@@ -30,6 +31,7 @@ export function createApiRouter(auth: Auth) {
   router.route(API_V1.SKILLS, skillsRouter)
   router.route(API_V1.CHAT, chatRouter)
   router.route(API_V1.MEMORY, memoryRouter)
+  router.route(API_V1.MCP, mcpRouter)
   router.route(API_V1.FILES, filesRouter)
   router.route(API_V1.SETTINGS, settingsRouter)
   router.route(API_V1.MODELS, modelsRouter)
