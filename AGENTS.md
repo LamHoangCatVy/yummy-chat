@@ -42,3 +42,9 @@ This project is indexed by GitNexus as **yummy-chat** (1243 symbols, 2604 relati
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Frontend Components
+
+- **MUST reuse existing shadcn components** for frontend work whenever an appropriate component already exists.
+- Before creating a new UI primitive, check `apps/fe/src/components/ui` and the shadcn component catalog. Add or compose the shadcn component when available.
+- **NEVER reinvent the wheel** by implementing custom versions of common components that shadcn or the project already provides.

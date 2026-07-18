@@ -89,6 +89,7 @@ export type ToolResultChunk = {
   readonly type: "tool-result"
   readonly toolCallId: string
   readonly toolName: string
+  readonly content: string
   readonly isError: boolean
 }
 

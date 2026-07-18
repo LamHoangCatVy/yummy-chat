@@ -30,6 +30,14 @@ import type { SessionVariables } from "../middleware/session.js"
 
 type RouteVariables = RequestIdVariables & SessionVariables
 
+interface PersistedToolCall {
+  readonly id: string
+  readonly name: string
+  readonly arguments: Record<string, unknown>
+  readonly status: "running" | "success" | "error"
+  readonly result?: string
+}
+
 export const chatRouter = new Hono<{ Variables: RouteVariables }>()
 
 chatRouter.use("*", requireAuth)
@@ -68,6 +76,9 @@ function getProvider(): LLMProvider {
       chunksJson: process.env.FAKE_PROVIDER_CHUNKS_JSON,
       ...(process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON
         ? { reasoningChunksJson: process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON }
+        : {}),
+      ...(process.env.FAKE_PROVIDER_TOOL_CHUNKS_JSON
+        ? { toolChunksJson: process.env.FAKE_PROVIDER_TOOL_CHUNKS_JSON }
         : {}),
       chunkDelayMs: 1,
     })
@@ -209,6 +220,7 @@ chatRouter.post("/stream", async (c) => {
   let assistantMsgId: MessageId | null = null
   let accumulatedText = ""
   let accumulatedReasoning = ""
+  const accumulatedToolCalls = new Map<string, PersistedToolCall>()
   let finalUsage: UsageMetadata | null = null
 
   const ctx = auditFromContext(c)
@@ -300,6 +312,12 @@ chatRouter.post("/stream", async (c) => {
               break
             }
             case "tool-call": {
+              accumulatedToolCalls.set(chunk.toolCallId, {
+                id: chunk.toolCallId,
+                name: chunk.toolName,
+                arguments: chunk.arguments,
+                status: "running",
+              })
               await stream.writeSSE({
                 event: "tool-call",
                 data: JSON.stringify({
@@ -311,11 +329,20 @@ chatRouter.post("/stream", async (c) => {
               break
             }
             case "tool-result": {
+              const existing = accumulatedToolCalls.get(chunk.toolCallId)
+              accumulatedToolCalls.set(chunk.toolCallId, {
+                id: chunk.toolCallId,
+                name: chunk.toolName,
+                arguments: existing?.arguments ?? {},
+                status: chunk.isError ? "error" : "success",
+                result: chunk.content,
+              })
               await stream.writeSSE({
                 event: "tool-result",
                 data: JSON.stringify({
                   toolCallId: chunk.toolCallId,
                   toolName: chunk.toolName,
+                  content: chunk.content,
                   isError: chunk.isError,
                 }),
               })
@@ -437,6 +464,9 @@ chatRouter.post("/stream", async (c) => {
             metadata: {
               ...(files.length > 0 ? { files } : {}),
               ...(accumulatedReasoning ? { reasoningContent: accumulatedReasoning } : {}),
+              ...(accumulatedToolCalls.size > 0
+                ? { toolCalls: [...accumulatedToolCalls.values()] }
+                : {}),
               model,
               usage: finalUsage,
               failed: isFailed,

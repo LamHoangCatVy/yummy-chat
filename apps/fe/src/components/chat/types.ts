@@ -25,6 +25,8 @@ export interface ChatMessage {
   readonly files?: readonly FileAttachment[]
   /** Reasoning/thinking content streamed by a reasoning model, separate from the answer. */
   readonly reasoningContent?: string
+  /** MCP tool calls emitted while the assistant response is streaming. */
+  readonly toolCalls?: readonly ToolCallActivity[]
 }
 
 /** A file attachment from the assistant that the user can download. */
@@ -32,6 +34,17 @@ export interface FileAttachment {
   readonly filename: string
   readonly downloadUrl: string
   readonly mimeType: string
+}
+
+export type ToolCallStatus = "running" | "success" | "error"
+
+/** Live state for one MCP tool invocation within an assistant message. */
+export interface ToolCallActivity {
+  readonly id: string
+  readonly name: string
+  readonly arguments: Readonly<Record<string, unknown>>
+  readonly status: ToolCallStatus
+  readonly result?: string
 }
 
 /** Possible states for the streaming connection. */
@@ -59,4 +72,17 @@ export interface StreamFinishEvent {
 export interface StreamErrorEvent {
   readonly error: string
   readonly code: string
+}
+
+export interface StreamToolCallEvent {
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly arguments: Record<string, unknown>
+}
+
+export interface StreamToolResultEvent {
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly content: string
+  readonly isError: boolean
 }

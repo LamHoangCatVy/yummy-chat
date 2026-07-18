@@ -15,6 +15,8 @@ import type {
   UsageMetadata,
 } from "./provider.js"
 
+type FakeToolChunk = Extract<StreamChunk, { readonly type: "tool-call" | "tool-result" }>
+
 // ── Configuration ───────────────────────────────────────────────────────────
 
 export interface FakeProviderOptions {
@@ -26,6 +28,10 @@ export interface FakeProviderOptions {
   readonly reasoningChunks?: readonly string[]
   /** JSON string of a string array for reasoning chunks. Parsed at constructor time. */
   readonly reasoningChunksJson?: string
+  /** Deterministic MCP tool events emitted before text chunks. */
+  readonly toolChunks?: readonly FakeToolChunk[]
+  /** JSON string of MCP tool events. Intended for integration tests. */
+  readonly toolChunksJson?: string
   /** Delay in ms between chunks.  Defaults to 50. */
   readonly chunkDelayMs?: number
   /** If set, throw after emitting this many text chunks. */
@@ -43,6 +49,7 @@ const DEFAULT_DELAY_MS = 50
 export class FakeLLMProvider implements LLMProvider {
   private readonly chunks: readonly string[]
   private readonly reasoningChunks: readonly string[]
+  private readonly toolChunks: readonly FakeToolChunk[]
   private readonly chunkDelayMs: number
   private readonly errorAfterChunks: number | undefined
   private readonly errorMessage: string
@@ -58,6 +65,11 @@ export class FakeLLMProvider implements LLMProvider {
       this.reasoningChunks = JSON.parse(options.reasoningChunksJson) as string[]
     } else {
       this.reasoningChunks = options.reasoningChunks ?? []
+    }
+    if (options.toolChunksJson) {
+      this.toolChunks = JSON.parse(options.toolChunksJson) as FakeToolChunk[]
+    } else {
+      this.toolChunks = options.toolChunks ?? []
     }
     this.chunkDelayMs = options.chunkDelayMs ?? DEFAULT_DELAY_MS
     this.errorAfterChunks = options.errorAfterChunks
@@ -91,6 +103,18 @@ export class FakeLLMProvider implements LLMProvider {
       }
 
       yield { type: "reasoning-delta", reasoningDelta: chunk }
+    }
+
+    for (const chunk of this.toolChunks) {
+      if (signal?.aborted) {
+        yield {
+          type: "finish",
+          finishReason: "abort",
+          usage: this.computeUsage(emittedTextChunks),
+        }
+        return
+      }
+      yield chunk
     }
 
     for (const chunk of this.chunks) {

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest"
-import { messageListItemSchema } from "../src/lib/api"
 import {
   mapMessageListItemToChatMessage,
   stripGeneratedJsonBlocks,
 } from "../src/components/chat/chat-transcript-helpers"
+import { messageListItemSchema } from "../src/lib/api"
 
 const baseMessage = {
   id: "msg-1",
@@ -67,7 +67,7 @@ describe("chat history file metadata", () => {
   })
 
   test("stripGeneratedJsonBlocks preserves text outside generated fences", () => {
-    const content = "Before\n```json\n{\"visible\":true}\n```\nAfter"
+    const content = 'Before\n```json\n{"visible":true}\n```\nAfter'
 
     expect(stripGeneratedJsonBlocks(content)).toBe(content)
   })
@@ -116,13 +116,57 @@ describe("chat history file metadata", () => {
     const chatMessage = mapMessageListItemToChatMessage({
       ...baseMessage,
       metadata: {
-        files: [
-          null,
-          { filename: "missing-url.pptx", mimeType: "application/vnd.ms-powerpoint" },
-        ],
+        files: [null, { filename: "missing-url.pptx", mimeType: "application/vnd.ms-powerpoint" }],
       },
     })
 
     expect(chatMessage.files).toBeUndefined()
+  })
+
+  test("mapMessageListItemToChatMessage restores persisted MCP tool results", () => {
+    const chatMessage = mapMessageListItemToChatMessage({
+      ...baseMessage,
+      metadata: {
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "mcp_123_weather_0",
+            arguments: { city: "Hanoi" },
+            status: "success",
+            result: "28 C",
+          },
+        ],
+      },
+    })
+
+    expect(chatMessage.toolCalls).toEqual([
+      {
+        id: "call-1",
+        name: "mcp_123_weather_0",
+        arguments: { city: "Hanoi" },
+        status: "success",
+        result: "28 C",
+      },
+    ])
+  })
+
+  test("mapMessageListItemToChatMessage ignores malformed MCP metadata", () => {
+    const chatMessage = mapMessageListItemToChatMessage({
+      ...baseMessage,
+      metadata: {
+        toolCalls: [
+          null,
+          { id: "missing-fields" },
+          {
+            id: "invalid-status",
+            name: "search",
+            arguments: {},
+            status: "unknown",
+          },
+        ],
+      },
+    })
+
+    expect(chatMessage.toolCalls).toBeUndefined()
   })
 })

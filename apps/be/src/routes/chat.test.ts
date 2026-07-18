@@ -352,6 +352,76 @@ describe("chat streaming API", () => {
         process.env.FAKE_PROVIDER_REASONING_CHUNKS_JSON = ""
       }
     })
+
+    it("streams and persists MCP tool results in assistant message metadata", async () => {
+      process.env.FAKE_PROVIDER_CHUNKS_JSON = JSON.stringify(["Weather loaded."])
+      process.env.FAKE_PROVIDER_TOOL_CHUNKS_JSON = JSON.stringify([
+        {
+          type: "tool-call",
+          toolCallId: "call-weather-1",
+          toolName: "mcp_123_weather_0",
+          arguments: { city: "Hanoi" },
+        },
+        {
+          type: "tool-result",
+          toolCallId: "call-weather-1",
+          toolName: "mcp_123_weather_0",
+          content: '{"temperature":28,"condition":"Sunny"}',
+          isError: false,
+        },
+      ])
+
+      try {
+        const app = createApp()
+        const convRes = await app.request("/api/v1/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookies },
+          body: JSON.stringify({ title: "MCP Persist Test" }),
+        })
+        const { id: freshConvId } = (await convRes.json()).data
+
+        const streamRes = await app.request("/api/v1/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookies },
+          body: JSON.stringify({
+            conversationId: freshConvId,
+            content: "Check the weather",
+            model: "fake-provider",
+          }),
+        })
+        const events = await parseSSEStream(streamRes, 10000)
+
+        const resultEvent = events.find((event) => event.event === "tool-result")
+        expect(resultEvent).toBeDefined()
+        expect(JSON.parse(resultEvent?.data ?? "{}")).toEqual({
+          toolCallId: "call-weather-1",
+          toolName: "mcp_123_weather_0",
+          content: '{"temperature":28,"condition":"Sunny"}',
+          isError: false,
+        })
+
+        const msgRes = await app.request(`/api/v1/conversations/${freshConvId}/messages`, {
+          headers: { Cookie: cookies },
+        })
+        const msgBody = await msgRes.json()
+        const assistantMessage = msgBody.data.data.find(
+          (message_: { role: string }) => message_.role === "assistant",
+        )
+
+        expect(assistantMessage?.metadata?.toolCalls).toEqual([
+          {
+            id: "call-weather-1",
+            name: "mcp_123_weather_0",
+            arguments: { city: "Hanoi" },
+            status: "success",
+            result: '{"temperature":28,"condition":"Sunny"}',
+          },
+        ])
+      } finally {
+        process.env.FAKE_PROVIDER_CHUNKS_JSON = ""
+        process.env.FAKE_PROVIDER_TOOL_CHUNKS_JSON = ""
+      }
+    })
   })
 
   describe("BYOK provider resolution", () => {

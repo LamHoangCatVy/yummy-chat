@@ -73,6 +73,13 @@ describe("OpenAIProvider MCP tool loop", () => {
 
     expect(executeTool).toHaveBeenCalledWith("mcp_123_weather", { city: "Hanoi" })
     expect(chunks).toContainEqual({ type: "text-delta", textDelta: "Sunny" })
+    expect(chunks).toContainEqual({
+      type: "tool-result",
+      toolCallId: "call-1",
+      toolName: "mcp_123_weather",
+      content: "28 C",
+      isError: false,
+    })
     expect(chunks.at(-1)).toMatchObject({ type: "finish", finishReason: "stop" })
     expect(create).toHaveBeenCalledTimes(2)
     const secondRequest = create.mock.calls[1]?.[0]

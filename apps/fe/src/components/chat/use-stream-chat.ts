@@ -4,6 +4,7 @@ import { listMessages } from "@/lib/api"
 import { API_V1 } from "@yummy/shared"
 import { useCallback, useRef, useState } from "react"
 import { mapMessageListItemToChatMessage } from "./chat-transcript-helpers"
+import { applyToolStreamEvent, parseToolStreamEvent } from "./tool-stream-events"
 import type { ChatMessage, FileAttachment, StreamStatus } from "./types"
 
 interface UseStreamChatOptions {
@@ -39,7 +40,7 @@ interface UseStreamChatReturn {
  * Flow:
  * 1. User sends message → added to local state immediately
  * 2. POST /api/v1/chat/stream with the message
- * 3. Read SSE response: "text" events append to assistant message
+ * 3. Read SSE response: text and MCP tool events update the assistant message
  * 4. "finish" event marks streaming complete
  * 5. "error" event sets error status
  */
@@ -169,6 +170,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
               try {
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 const parsed: unknown = JSON.parse(data)
+                const toolEvent = parseToolStreamEvent(parsed)
 
                 if (
                   typeof parsed === "object" &&
@@ -195,6 +197,17 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                         ? {
                             ...m,
                             reasoningContent: (m.reasoningContent ?? "") + reasoningDelta,
+                          }
+                        : m,
+                    ),
+                  )
+                } else if (toolEvent) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? {
+                            ...m,
+                            toolCalls: applyToolStreamEvent(m.toolCalls ?? [], toolEvent),
                           }
                         : m,
                     ),

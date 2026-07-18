@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { stripGeneratedJsonBlocks } from "./chat-transcript-helpers"
+import { ToolActivity } from "./tool-activity"
 import type { ChatMessage, FileAttachment } from "./types"
 import { useTypewriter } from "./use-typewriter"
 
@@ -52,7 +53,10 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
 
   const lastMessage = messages[messages.length - 1]
   const currentLastMessageLength =
-    (lastMessage?.content.length ?? 0) + (lastMessage?.reasoningContent?.length ?? 0)
+    (lastMessage?.content.length ?? 0) +
+    (lastMessage?.reasoningContent?.length ?? 0) +
+    (lastMessage?.toolCalls?.map((toolCall) => `${toolCall.id}:${toolCall.status}`).join("")
+      .length ?? 0)
   if (currentLastMessageLength !== lastMessageContentLengthRef.current) {
     lastMessageContentLengthRef.current = currentLastMessageLength
     if (isAtBottomRef.current) {
@@ -132,10 +136,10 @@ function MessageRow({
     <div className="mb-spacing-8">
       <div className="text-justify text-[0.9375rem] leading-[1.7] text-text-primary">
         {message.reasoningContent && (
-          <ThinkingPanel
-            reasoning={message.reasoningContent}
-            isStreaming={message.isStreaming}
-          />
+          <ThinkingPanel reasoning={message.reasoningContent} isStreaming={message.isStreaming} />
+        )}
+        {message.toolCalls && message.toolCalls.length > 0 && (
+          <ToolActivity toolCalls={message.toolCalls} />
         )}
         <AssistantMessageContent
           content={displayContent}

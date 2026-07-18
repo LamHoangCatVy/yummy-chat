@@ -184,6 +184,7 @@ export class OpenAIProvider implements LLMProvider {
             type: "tool-result",
             toolCallId: call.id,
             toolName: call.name,
+            content: result.content,
             isError: result.isError === true,
           }
         }
