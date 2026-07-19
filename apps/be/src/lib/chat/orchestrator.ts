@@ -65,12 +65,17 @@ export interface OrchestratorDeps {
   readonly tokenBudget?: number
   readonly tools?: readonly ProviderTool[]
   readonly executeTool?: ProviderToolExecutor
+  readonly agentSkills?: {
+    readonly catalogPrompt: string
+    readonly activeSkillPrompt: string | null
+    readonly activeSkillName: string | null
+  }
 }
 
 // ── Orchestrator ────────────────────────────────────────────────────────────
 
 export function createOrchestrator(deps: OrchestratorDeps) {
-  const { provider, tokenBudget = DEFAULT_TOKEN_BUDGET, tools, executeTool } = deps
+  const { provider, tokenBudget = DEFAULT_TOKEN_BUDGET, tools, executeTool, agentSkills } = deps
 
   return {
     async orchestrate(
@@ -86,9 +91,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         .reverse() // oldest first
 
       // 2. Load skill if specified
-      let skillPrompt: string | null = null
-      let skillName: string | null = null
-      if (request.skillId) {
+      let skillPrompt = agentSkills?.activeSkillPrompt ?? null
+      let skillName = agentSkills?.activeSkillName ?? null
+      if (!agentSkills && request.skillId) {
         const skRepo = skillRepository(actor)
         const skillRow = await skRepo.getById(request.skillId)
         if (skillRow) {
@@ -108,7 +113,11 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       // 4. Assemble system prompt
-      const systemPrompt = buildSystemPrompt(skillPrompt, memoryEntries)
+      const systemPrompt = buildSystemPrompt(
+        skillPrompt,
+        memoryEntries,
+        agentSkills?.catalogPrompt ?? "",
+      )
 
       // 5. Build messages with budget truncation
       const { messages, included, truncated } = buildMessagesWithBudget(
@@ -199,11 +208,19 @@ async function loadMemoryEntries(userId: UserId) {
   return db.select().from(memoryEntry).where(eq(memoryEntry.userId, userId)).limit(20)
 }
 
-function buildSystemPrompt(skillPrompt: string | null, memoryEntries: readonly string[]): string {
+function buildSystemPrompt(
+  skillPrompt: string | null,
+  memoryEntries: readonly string[],
+  skillCatalog = "",
+): string {
   const parts: string[] = ["You are a helpful assistant."]
 
+  if (skillCatalog) {
+    parts.push(`\n${skillCatalog}`)
+  }
+
   if (skillPrompt) {
-    parts.push(`\n## Skill Instructions\n${skillPrompt}`)
+    parts.push(`\n## Active Agent Skill Instructions\n${skillPrompt}`)
   }
 
   if (memoryEntries.length > 0) {

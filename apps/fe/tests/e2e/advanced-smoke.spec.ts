@@ -43,6 +43,9 @@ test.describe("Advanced smoke: skills + memory", () => {
 
     await page.getByLabel("Name").fill(skillName)
     await page.getByLabel("Model").fill("fake-provider")
+    await page
+      .getByLabel("Description and activation trigger")
+      .fill("Use for the Agent Skills end-to-end smoke test.")
     await page.getByLabel("System Prompt").fill("You are an E2E test assistant.")
 
     await page.getByRole("button", { name: /create skill/i }).click()

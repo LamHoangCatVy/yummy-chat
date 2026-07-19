@@ -7,6 +7,7 @@ import {
   memoryEntry,
   message,
   skill,
+  skillResource,
   userApiSettings,
   userMemorySettings,
 } from "@yummy/db/schema"
@@ -19,6 +20,7 @@ export type ConversationRow = typeof conversation.$inferSelect
 export type MessageRow = typeof message.$inferSelect
 export type MemoryEntryRow = typeof memoryEntry.$inferSelect
 export type SkillRow = typeof skill.$inferSelect
+export type SkillResourceRow = typeof skillResource.$inferSelect
 export type UserApiSettingsRow = typeof userApiSettings.$inferSelect
 
 // ── Paginated result shape ──────────────────────────────────────────────────
@@ -256,23 +258,45 @@ export function memoryRepository(actor: Actor) {
 // ── Skill repository (owner-scoped) ─────────────────────────────────────────
 
 export function skillRepository(actor: Actor) {
+  const getOwnedSkill = (id: SkillId): Promise<SkillRow | undefined> =>
+    db
+      .select()
+      .from(skill)
+      .where(and(eq(skill.id, id), eq(skill.ownerId, actor.userId)))
+      .then((rows) => rows[0])
+
   return {
     list(): Promise<SkillRow[]> {
       return db.select().from(skill).where(eq(skill.ownerId, actor.userId))
     },
 
-    getById(id: SkillId): Promise<SkillRow | undefined> {
+    listEnabled(): Promise<SkillRow[]> {
       return db
         .select()
         .from(skill)
-        .where(and(eq(skill.id, id), eq(skill.ownerId, actor.userId)))
+        .where(and(eq(skill.ownerId, actor.userId), eq(skill.enabled, true)))
+    },
+
+    getById(id: SkillId): Promise<SkillRow | undefined> {
+      return getOwnedSkill(id)
+    },
+
+    getBySlug(slug: string): Promise<SkillRow | undefined> {
+      return db
+        .select()
+        .from(skill)
+        .where(and(eq(skill.slug, slug), eq(skill.ownerId, actor.userId)))
         .then((rows) => rows[0])
     },
 
     create(data: {
       id: SkillId
       name: string
+      slug: string
+      description: string
       prompt: string
+      manifest?: Record<string, unknown>
+      enabled?: boolean
       model: string
       temperature?: number | null
       maxTokens?: number | null
@@ -283,7 +307,11 @@ export function skillRepository(actor: Actor) {
           id: data.id,
           ownerId: actor.userId,
           name: data.name,
+          slug: data.slug,
+          description: data.description,
           prompt: data.prompt,
+          manifest: data.manifest ?? {},
+          enabled: data.enabled ?? true,
           model: data.model,
           temperature: data.temperature ?? null,
           maxTokens: data.maxTokens ?? null,
@@ -296,7 +324,11 @@ export function skillRepository(actor: Actor) {
       id: SkillId,
       data: {
         name?: string
+        slug?: string
+        description?: string
         prompt?: string
+        manifest?: Record<string, unknown>
+        enabled?: boolean
         model?: string
         temperature?: number | null
         maxTokens?: number | null
@@ -304,7 +336,11 @@ export function skillRepository(actor: Actor) {
     ): Promise<SkillRow | undefined> {
       const setData: Record<string, unknown> = { updatedAt: new Date() }
       if (data.name !== undefined) setData.name = data.name
+      if (data.slug !== undefined) setData.slug = data.slug
+      if (data.description !== undefined) setData.description = data.description
       if (data.prompt !== undefined) setData.prompt = data.prompt
+      if (data.manifest !== undefined) setData.manifest = data.manifest
+      if (data.enabled !== undefined) setData.enabled = data.enabled
       if (data.model !== undefined) setData.model = data.model
       if (data.temperature !== undefined) setData.temperature = data.temperature
       if (data.maxTokens !== undefined) setData.maxTokens = data.maxTokens
@@ -324,6 +360,53 @@ export function skillRepository(actor: Actor) {
         .then((rows) => rows.length > 0)
     },
 
+    async listResources(id: SkillId): Promise<SkillResourceRow[]> {
+      if (!(await getOwnedSkill(id))) return []
+      return db
+        .select()
+        .from(skillResource)
+        .where(eq(skillResource.skillId, id))
+        .orderBy(asc(skillResource.path))
+    },
+
+    async getResource(id: SkillId, resourcePath: string): Promise<SkillResourceRow | undefined> {
+      if (!(await getOwnedSkill(id))) return undefined
+      return db
+        .select()
+        .from(skillResource)
+        .where(and(eq(skillResource.skillId, id), eq(skillResource.path, resourcePath)))
+        .then((rows) => rows[0])
+    },
+
+    async replaceResources(
+      id: SkillId,
+      resources: readonly {
+        path: string
+        content: string
+        encoding: string
+        mimeType: string
+        byteSize: number
+      }[],
+    ): Promise<boolean> {
+      if (!(await getOwnedSkill(id))) return false
+      await db.transaction(async (tx) => {
+        await tx.delete(skillResource).where(eq(skillResource.skillId, id))
+        if (resources.length > 0) {
+          await tx.insert(skillResource).values(
+            resources.map((resource) => ({
+              skillId: id,
+              path: resource.path,
+              content: resource.content,
+              encoding: resource.encoding,
+              mimeType: resource.mimeType,
+              byteSize: resource.byteSize,
+            })),
+          )
+        }
+      })
+      return true
+    },
+
     // ── Conversation skill snapshot ──────────────────────────────────────
 
     getConversationSkill(
@@ -336,7 +419,14 @@ export function skillRepository(actor: Actor) {
           skillConfig: conversationSkillSnapshot.skillConfig,
         })
         .from(conversationSkillSnapshot)
-        .where(eq(conversationSkillSnapshot.conversationId, conversationId))
+        .innerJoin(skill, eq(conversationSkillSnapshot.skillId, skill.id))
+        .where(
+          and(
+            eq(conversationSkillSnapshot.conversationId, conversationId),
+            eq(skill.ownerId, actor.userId),
+            eq(skill.enabled, true),
+          ),
+        )
         .then((rows) => rows[0])
     },
 
@@ -355,7 +445,7 @@ export function skillRepository(actor: Actor) {
           skillConfig: skillConfig ?? null,
         })
         .onConflictDoUpdate({
-          target: conversationSkillSnapshot.id,
+          target: conversationSkillSnapshot.conversationId,
           set: {
             skillId,
             skillName,

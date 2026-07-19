@@ -1,7 +1,7 @@
 "use client"
 
 import { useConversation } from "@/components/sidebar/conversation-context"
-import { createConversation, generateConversationTitle } from "@/lib/api"
+import { createConversation, generateConversationTitle, getConversationSkill } from "@/lib/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ChatComposer } from "./chat-composer"
 import { ChatTranscript } from "./chat-transcript"
@@ -29,16 +29,32 @@ export function ChatContainer({ userName }: ChatContainerProps) {
   })
 
   useEffect(() => {
+    let cancelled = false
     if (conversationId) {
       if (autoCreateRef.current) {
         autoCreateRef.current = false
-        return
+        setSelectedSkillId(null)
+        return () => {
+          cancelled = true
+        }
       }
       titleGeneratedRef.current = false
+      setSelectedSkillId(null)
       clear()
       void loadMessages(conversationId)
+      void getConversationSkill(conversationId)
+        .then((selection) => {
+          if (!cancelled) setSelectedSkillId(selection.skillId)
+        })
+        .catch(() => {
+          if (!cancelled) setSelectedSkillId(null)
+        })
     } else {
+      setSelectedSkillId(null)
       setDisableNewChat(false)
+    }
+    return () => {
+      cancelled = true
     }
   }, [conversationId, clear, loadMessages, setDisableNewChat])
 

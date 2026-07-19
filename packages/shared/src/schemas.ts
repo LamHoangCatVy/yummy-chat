@@ -30,11 +30,23 @@ export const conversationSchema = z.object({
   updatedAt: z.string().datetime(),
 })
 
+export const agentSkillNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Skill name must contain lowercase letters, numbers, and single hyphens only",
+  )
+
 export const skillSchema = z.object({
   id: skillIdSchema,
   ownerId: userIdSchema,
   name: z.string().min(1).max(100),
+  slug: agentSkillNameSchema,
+  description: z.string().min(1).max(1024),
   prompt: z.string().max(100_000),
+  enabled: z.boolean(),
   model: z.string().min(1).max(100),
   temperature: z.number().min(0).max(2).nullish(),
   maxTokens: z.number().int().min(1).max(1_000_000).nullish(),
@@ -44,15 +56,21 @@ export const skillSchema = z.object({
 
 export const createSkillInputSchema = z.object({
   name: z.string().min(1).max(100),
+  slug: agentSkillNameSchema.optional(),
+  description: z.string().min(1).max(1024),
   prompt: z.string().min(1).max(100_000),
-  model: z.string().min(1).max(100),
+  enabled: z.boolean().optional().default(true),
+  model: z.string().min(1).max(100).optional().default("default"),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().min(1).max(1_000_000).optional(),
 })
 
 export const updateSkillInputSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  slug: agentSkillNameSchema.optional(),
+  description: z.string().min(1).max(1024).optional(),
   prompt: z.string().min(1).max(100_000).optional(),
+  enabled: z.boolean().optional(),
   model: z.string().min(1).max(100).optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().min(1).max(1_000_000).optional(),

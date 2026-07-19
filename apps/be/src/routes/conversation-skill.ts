@@ -51,6 +51,40 @@ async function resolveConversationId(c: Context, actor: Actor): Promise<Conversa
   return idParam as ConversationId
 }
 
+// ── GET / ───────────────────────────────────────────────────────────────────
+
+conversationSkillRouter.get("/", async (c) => {
+  const actor = actorFrom(c)
+  const conversationId = await resolveConversationId(c, actor)
+  if (!conversationId) {
+    const res: ApiErrorResponse = {
+      success: false,
+      error: {
+        type: "NOT_FOUND_ERROR",
+        message: "Conversation not found",
+        statusCode: 404,
+        resource: "conversation",
+      },
+      meta: meta(c),
+    }
+    return c.json(res, 404)
+  }
+
+  const stored = await skillRepository(actor).getConversationSkill(conversationId)
+  const res: ApiResponse<{
+    skillId: string | null
+    skillName: string | null
+  }> = {
+    success: true,
+    data: {
+      skillId: stored?.skillId ?? null,
+      skillName: stored?.skillName ?? null,
+    },
+    meta: meta(c),
+  }
+  return c.json(res, 200)
+})
+
 // ── PATCH / ──────────────────────────────────────────────────────────────────
 
 conversationSkillRouter.patch("/", async (c) => {
@@ -119,7 +153,7 @@ conversationSkillRouter.patch("/", async (c) => {
 
   // Verify skill exists and is owned by the actor
   const skillRow = await skillRepo.getById(parsed.data.skillId as SkillId)
-  if (!skillRow) {
+  if (!skillRow || !skillRow.enabled) {
     const res: ApiErrorResponse = {
       success: false,
       error: {
@@ -139,7 +173,10 @@ conversationSkillRouter.patch("/", async (c) => {
     skillRow.id,
     skillRow.name,
     JSON.stringify({
+      slug: skillRow.slug,
+      description: skillRow.description,
       prompt: skillRow.prompt,
+      manifest: skillRow.manifest,
       model: skillRow.model,
       temperature: skillRow.temperature,
       maxTokens: skillRow.maxTokens,

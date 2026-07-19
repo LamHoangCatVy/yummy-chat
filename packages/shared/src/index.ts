@@ -43,6 +43,7 @@ export {
   mcpToolSchema,
   mcpToolListResponseSchema,
   appendMessageInputSchema,
+  agentSkillNameSchema,
   chatMessageSchema,
   conversationIdSchema,
   conversationListResponseSchema,

@@ -1,3 +1,4 @@
+import JSZip from "jszip"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createTestDatabase } from "../test/db"
 
@@ -35,6 +36,7 @@ async function signUpAndSignIn(
 function validPayload() {
   return {
     name: "Test Skill",
+    description: "Use for test skill requests.",
     prompt: "You are a helpful assistant.",
     model: "gpt-4",
     temperature: 0.7,
@@ -134,6 +136,7 @@ describe("skills API", () => {
         headers: { "Content-Type": "application/json", Cookie: cookiesA },
         body: JSON.stringify({
           name: "Minimal Skill",
+          description: "Use when concise answers are requested.",
           prompt: "Be concise.",
           model: "gpt-3.5-turbo",
         }),
@@ -141,8 +144,82 @@ describe("skills API", () => {
       expect(res.status).toBe(201)
       const body = await res.json()
       expect(body.data.name).toBe("Minimal Skill")
+      expect(body.data.slug).toBe("minimal-skill")
+      expect(body.data.enabled).toBe(true)
       expect(body.data.temperature).toBeNull()
       expect(body.data.maxTokens).toBeNull()
+    })
+  })
+
+  describe("Agent Skills import/export", () => {
+    it("imports a SKILL.md bundle and exports its supporting resources", async () => {
+      const archive = new JSZip()
+      archive.file(
+        "SKILL.md",
+        `---
+name: incident-response
+description: Investigate production incidents. Use when an outage or error spike is reported.
+license: MIT
+---
+
+# Incident response
+
+Read the runbook before proposing remediation.
+`,
+      )
+      archive.file("references/runbook.md", "# Runbook\n\nCheck logs before restarting services.")
+      const zip = await archive.generateAsync({ type: "uint8array" })
+      const formData = new FormData()
+      formData.set("file", new File([zip], "incident-response.zip", { type: "application/zip" }))
+
+      const app = createApp()
+      const importRes = await app.request("/api/v1/skills/import", {
+        method: "POST",
+        headers: { Cookie: cookiesA },
+        body: formData,
+      })
+      expect(importRes.status).toBe(201)
+      const imported = await importRes.json()
+      expect(imported.data.slug).toBe("incident-response")
+      expect(imported.data.description).toContain("outage")
+
+      const exportRes = await app.request(`/api/v1/skills/${imported.data.id}/export`, {
+        headers: { Cookie: cookiesA },
+      })
+      expect(exportRes.status).toBe(200)
+      expect(exportRes.headers.get("content-type")).toContain("application/zip")
+
+      const exported = await JSZip.loadAsync(await exportRes.arrayBuffer())
+      expect(await exported.file("SKILL.md")?.async("string")).toContain("name: incident-response")
+      expect(await exported.file("references/runbook.md")?.async("string")).toContain("Check logs")
+    })
+
+    it("rejects a bundle with a traversal resource path", async () => {
+      const archive = new JSZip()
+      archive.file(
+        "SKILL.md",
+        `---
+name: unsafe-skill
+description: A bundle used to verify path validation.
+---
+
+# Unsafe
+`,
+      )
+      archive.file("../secret.txt", "secret")
+      const formData = new FormData()
+      formData.set(
+        "file",
+        new File([await archive.generateAsync({ type: "uint8array" })], "unsafe.zip"),
+      )
+
+      const app = createApp()
+      const res = await app.request("/api/v1/skills/import", {
+        method: "POST",
+        headers: { Cookie: cookiesA },
+        body: formData,
+      })
+      expect(res.status).toBe(400)
     })
   })
 
@@ -333,6 +410,12 @@ describe("skills API", () => {
       expect(body.success).toBe(true)
       expect(body.data.skillId).toBe(skillId)
       expect(body.data.skillName).toBe("Updated Skill")
+
+      const getRes = await app.request(`/api/v1/conversations/${conversationId}/skill`, {
+        headers: { Cookie: cookiesA },
+      })
+      expect(getRes.status).toBe(200)
+      expect((await getRes.json()).data.skillId).toBe(skillId)
     })
 
     it("clears a skill from a conversation", async () => {
@@ -346,6 +429,11 @@ describe("skills API", () => {
       const body = await res.json()
       expect(body.success).toBe(true)
       expect(body.data.skillId).toBeNull()
+
+      const getRes = await app.request(`/api/v1/conversations/${conversationId}/skill`, {
+        headers: { Cookie: cookiesA },
+      })
+      expect((await getRes.json()).data.skillId).toBeNull()
     })
 
     it("returns 404 for non-existent conversation", async () => {

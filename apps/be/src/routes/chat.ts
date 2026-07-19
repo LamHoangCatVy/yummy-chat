@@ -5,6 +5,7 @@ import type { ApiErrorResponse, ConversationId, MessageId, SkillId, UserId } fro
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
 import { z } from "zod"
+import { createAgentSkillToolSet } from "../lib/agent-skills/loader.js"
 import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
 import type { Actor } from "../lib/authz.js"
 import { createOrchestrator } from "../lib/chat/orchestrator.js"
@@ -15,6 +16,7 @@ import { OpenAIProvider } from "../lib/llm/openai-provider.js"
 import { extractPptxJson, generatePptxBuffer } from "../lib/llm/pptx-generator.js"
 import type { LLMProvider } from "../lib/llm/provider.js"
 import type { UsageMetadata } from "../lib/llm/provider.js"
+import { combineProviderToolSets } from "../lib/llm/tool-set.js"
 import { extractXlsxJson, generateXlsxBuffer } from "../lib/llm/xlsx-generator.js"
 import { createMcpToolSet } from "../lib/mcp/client.js"
 import { redactString } from "../lib/redact.js"
@@ -37,6 +39,8 @@ interface PersistedToolCall {
   readonly status: "running" | "success" | "error"
   readonly result?: string
 }
+
+const AGENT_SKILL_TOOL_NAMES = new Set(["activate_skill", "read_skill_resource"])
 
 export const chatRouter = new Hono<{ Variables: RouteVariables }>()
 
@@ -210,11 +214,21 @@ chatRouter.post("/stream", async (c) => {
 
   // Create orchestrator and run
   const provider = await resolveProviderForUser(user.id)
+  const agentSkillToolSet = await createAgentSkillToolSet(
+    actor,
+    skillId ? (skillId as SkillId) : undefined,
+  )
   const mcpToolSet = await createMcpToolSet(actor.userId)
+  const toolSet = combineProviderToolSets([agentSkillToolSet, mcpToolSet])
   const orchestrator = createOrchestrator({
     provider,
-    tools: mcpToolSet.tools,
-    executeTool: mcpToolSet.execute,
+    tools: toolSet.tools,
+    executeTool: toolSet.execute,
+    agentSkills: {
+      catalogPrompt: agentSkillToolSet.catalogPrompt,
+      activeSkillPrompt: agentSkillToolSet.activeSkillPrompt,
+      activeSkillName: agentSkillToolSet.activeSkillName,
+    },
   })
 
   let assistantMsgId: MessageId | null = null
@@ -258,6 +272,7 @@ chatRouter.post("/stream", async (c) => {
       content: "",
       metadata: {
         skillUsed: result.metadata.skillUsed,
+        skillsActivated: agentSkillToolSet.getActivatedSkills(),
         memoryEntriesUsed: result.metadata.memoryEntriesUsed,
         model,
         streaming: true,
@@ -329,20 +344,25 @@ chatRouter.post("/stream", async (c) => {
               break
             }
             case "tool-result": {
+              const clientResult = AGENT_SKILL_TOOL_NAMES.has(chunk.toolName)
+                ? chunk.toolName === "activate_skill"
+                  ? "Agent Skill instructions loaded."
+                  : "Agent Skill resource loaded."
+                : chunk.content
               const existing = accumulatedToolCalls.get(chunk.toolCallId)
               accumulatedToolCalls.set(chunk.toolCallId, {
                 id: chunk.toolCallId,
                 name: chunk.toolName,
                 arguments: existing?.arguments ?? {},
                 status: chunk.isError ? "error" : "success",
-                result: chunk.content,
+                result: clientResult,
               })
               await stream.writeSSE({
                 event: "tool-result",
                 data: JSON.stringify({
                   toolCallId: chunk.toolCallId,
                   toolName: chunk.toolName,
-                  content: chunk.content,
+                  content: clientResult,
                   isError: chunk.isError,
                 }),
               })
@@ -357,7 +377,7 @@ chatRouter.post("/stream", async (c) => {
           data: JSON.stringify({ error: redactString(errorMsg), code: "STREAM_ERROR" }),
         })
       } finally {
-        await mcpToolSet.close()
+        await toolSet.close()
         // Persist generated files and update the placeholder message
         if (assistantMsgId) {
           const fileRepo = generatedFileRepository(actor)
@@ -472,6 +492,7 @@ chatRouter.post("/stream", async (c) => {
               failed: isFailed,
               completedAt: new Date().toISOString(),
               skillUsed: result.metadata.skillUsed,
+              skillsActivated: agentSkillToolSet.getActivatedSkills(),
               memoryEntriesUsed: result.metadata.memoryEntriesUsed,
             },
           })
@@ -488,7 +509,7 @@ chatRouter.post("/stream", async (c) => {
       }
     })
   } catch (err) {
-    await mcpToolSet.close()
+    await toolSet.close()
     const errorMsg = err instanceof Error ? err.message : "Orchestration failed"
 
     emitAuditEvent({

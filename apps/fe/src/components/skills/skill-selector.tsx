@@ -19,7 +19,8 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const selectedSkill = skills.find((s) => s.id === selectedSkillId) ?? null
+  const enabledSkills = skills.filter((skill) => skill.enabled)
+  const selectedSkill = enabledSkills.find((s) => s.id === selectedSkillId) ?? null
 
   const fetchSkills = useCallback(async () => {
     setStatus("loading")
@@ -95,7 +96,7 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
     )
   }
 
-  if (skills.length === 0) return null
+  if (enabledSkills.length === 0) return null
 
   return (
     <div ref={containerRef} className="relative">
@@ -137,7 +138,7 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
               <span className="text-text-tertiary">Clear skill selection</span>
             </button>
           )}
-          {skills.map((skill) => (
+          {enabledSkills.map((skill) => (
             <button
               key={skill.id}
               type="button"
@@ -153,7 +154,7 @@ export function SkillSelector({ conversationId, selectedSkillId, onSelect }: Ski
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{skill.name}</div>
                 <div className="truncate text-[0.75rem] leading-[1.4] text-text-tertiary">
-                  {skill.model}
+                  {skill.description}
                 </div>
               </div>
             </button>

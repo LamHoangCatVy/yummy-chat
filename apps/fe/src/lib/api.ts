@@ -171,6 +171,38 @@ export function deleteSkill(id: string) {
   return fetchApi(`${API_V1.SKILLS}/${id}`, { method: "DELETE" })
 }
 
+export async function importAgentSkill(file: File): Promise<Skill> {
+  const formData = new FormData()
+  formData.set("file", file)
+  const response = await fetch(`${API_V1.SKILLS}/import`, {
+    method: "POST",
+    body: formData,
+  })
+  const json = (await response.json()) as ApiResponse<unknown> | ApiErrorResponse
+  if (!response.ok || !json.success) {
+    throw new ApiError(response.status, json as ApiErrorResponse)
+  }
+  return skillSchema.parse(json.data)
+}
+
+export async function downloadAgentSkill(id: string): Promise<Blob> {
+  const response = await fetch(`${API_V1.SKILLS}/${id}/export`)
+  if (!response.ok) {
+    const error = (await response.json()) as ApiErrorResponse
+    throw new ApiError(response.status, error)
+  }
+  return response.blob()
+}
+
+export function getConversationSkill(conversationId: string) {
+  return fetchApi(`${API_V1.CONVERSATIONS}/${conversationId}/skill`, {
+    schema: z.object({
+      skillId: z.string().uuid().nullable(),
+      skillName: z.string().nullable(),
+    }),
+  })
+}
+
 export function setConversationSkill(conversationId: string, skillId: string | null) {
   return fetchApi(`${API_V1.CONVERSATIONS}/${conversationId}/skill`, {
     method: "PATCH",
