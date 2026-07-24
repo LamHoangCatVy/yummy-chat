@@ -42,6 +42,8 @@ export interface ChatMessage {
   readonly reasoningContent?: string
   /** MCP tool calls emitted while the assistant response is streaming. */
   readonly toolCalls?: readonly ToolCallActivity[]
+  /** Ordered text and tool-call parts, preserving the provider execution timeline. */
+  readonly responseParts?: readonly AssistantResponsePart[]
   /** Saved memories or past chats that contributed context to this answer. */
   readonly memorySources?: readonly MemorySource[]
   /** Sensitive memory awaiting an explicit user confirmation. */
@@ -65,6 +67,10 @@ export interface ToolCallActivity {
   readonly status: ToolCallStatus
   readonly result?: string
 }
+
+export type AssistantResponsePart =
+  | { readonly type: "text"; readonly content: string }
+  | { readonly type: "tool-call"; readonly toolCallId: string }
 
 /** Possible states for the streaming connection. */
 export type StreamStatus = "idle" | "streaming" | "error" | "done"

@@ -1,34 +1,89 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+
+const MAX_CHARACTERS_PER_FRAME = 24
+
+export function advanceTypewriterLength(currentLength: number, targetLength: number): number {
+  const behind = targetLength - currentLength
+  if (behind <= 0) return currentLength
+
+  const step = Math.min(MAX_CHARACTERS_PER_FRAME, Math.max(1, Math.ceil(behind / 20)))
+  return Math.min(targetLength, currentLength + step)
+}
 
 export function useTypewriter(
   content: string,
-  isStreaming: boolean,
+  animate: boolean,
 ): { text: string; isTyping: boolean } {
-  const [displayedLength, setDisplayedLength] = useState(() => (isStreaming ? 0 : content.length))
+  const initialLength = animate ? 0 : content.length
+  const [displayedLength, setDisplayedLength] = useState(initialLength)
+  const displayedLengthRef = useRef(initialLength)
+  const targetLengthRef = useRef(content.length)
+  const animateRef = useRef(animate)
+  const frameRef = useRef<number | null>(null)
+  const tickRef = useRef<() => void>(() => undefined)
 
-  useEffect(() => {
-    if (displayedLength >= content.length) {
+  const scheduleFrame = useCallback(() => {
+    if (
+      frameRef.current !== null ||
+      !animateRef.current ||
+      displayedLengthRef.current >= targetLengthRef.current
+    ) {
       return
     }
 
-    const frameId = requestAnimationFrame(() => {
-      setDisplayedLength((currentLength) => {
-        const behind = content.length - currentLength
-        if (behind <= 0) {
-          return currentLength
-        }
+    frameRef.current = requestAnimationFrame(() => tickRef.current())
+  }, [])
 
-        return Math.min(content.length, currentLength + Math.max(1, Math.ceil(behind / 20)))
-      })
-    })
+  tickRef.current = () => {
+    frameRef.current = null
+    if (!animateRef.current) return
 
-    return () => {
-      cancelAnimationFrame(frameId)
+    const nextLength = advanceTypewriterLength(displayedLengthRef.current, targetLengthRef.current)
+    if (nextLength !== displayedLengthRef.current) {
+      displayedLengthRef.current = nextLength
+      setDisplayedLength(nextLength)
     }
-  }, [displayedLength, content])
+
+    if (nextLength < targetLengthRef.current) {
+      scheduleFrame()
+    }
+  }
+
+  useEffect(() => {
+    targetLengthRef.current = content.length
+    animateRef.current = animate
+
+    if (!animate) {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
+      displayedLengthRef.current = content.length
+      setDisplayedLength(content.length)
+      return
+    }
+
+    if (displayedLengthRef.current > content.length) {
+      displayedLengthRef.current = content.length
+      setDisplayedLength(content.length)
+    }
+
+    scheduleFrame()
+  }, [animate, content, scheduleFrame])
+
+  useEffect(() => {
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
+    }
+  }, [])
+
+  const visibleLength = animate ? Math.min(displayedLength, content.length) : content.length
 
   return {
-    text: content.slice(0, displayedLength),
-    isTyping: displayedLength < content.length,
+    text: content.slice(0, visibleLength),
+    isTyping: animate && visibleLength < content.length,
   }
 }

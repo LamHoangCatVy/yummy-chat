@@ -178,6 +178,8 @@ describe("chat streaming API", () => {
 
       expect(res.status).toBe(200)
       expect(res.headers.get("content-type")).toContain("text/event-stream")
+      expect(res.headers.get("cache-control")).toBe("no-cache, no-transform")
+      expect(res.headers.get("x-accel-buffering")).toBe("no")
 
       const events = await parseSSEStream(res, 10000)
 
@@ -416,6 +418,10 @@ describe("chat streaming API", () => {
             status: "success",
             result: '{"temperature":28,"condition":"Sunny"}',
           },
+        ])
+        expect(assistantMessage?.metadata?.responseParts).toEqual([
+          { type: "tool-call", toolCallId: "call-weather-1" },
+          { type: "text", content: "Weather loaded." },
         ])
       } finally {
         process.env.FAKE_PROVIDER_CHUNKS_JSON = ""

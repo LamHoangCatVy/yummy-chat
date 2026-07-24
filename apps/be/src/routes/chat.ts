@@ -42,7 +42,31 @@ interface PersistedToolCall {
   readonly result?: string
 }
 
+type PersistedResponsePart =
+  | { readonly type: "text"; readonly content: string }
+  | { readonly type: "tool-call"; readonly toolCallId: string }
+
 const AGENT_SKILL_TOOL_NAMES = new Set(["activate_skill", "read_skill_resource"])
+
+function appendPersistedTextPart(parts: PersistedResponsePart[], textDelta: string): void {
+  if (!textDelta) return
+
+  const last = parts.at(-1)
+  if (last?.type === "text") {
+    parts[parts.length - 1] = { type: "text", content: last.content + textDelta }
+    return
+  }
+
+  parts.push({ type: "text", content: textDelta })
+}
+
+function appendPersistedToolPart(parts: PersistedResponsePart[], toolCallId: string): void {
+  if (parts.some((part) => part.type === "tool-call" && part.toolCallId === toolCallId)) {
+    return
+  }
+
+  parts.push({ type: "tool-call", toolCallId })
+}
 
 export const chatRouter = new Hono<{ Variables: RouteVariables }>()
 
@@ -241,6 +265,7 @@ chatRouter.post("/stream", async (c) => {
   let accumulatedText = ""
   let accumulatedReasoning = ""
   const accumulatedToolCalls = new Map<string, PersistedToolCall>()
+  const accumulatedResponseParts: PersistedResponsePart[] = []
   let finalUsage: UsageMetadata | null = null
   let finalFinishReason: "stop" | "length" | "error" | "abort" | null = null
 
@@ -288,7 +313,7 @@ chatRouter.post("/stream", async (c) => {
     })
 
     // Stream SSE response
-    return streamSSE(c, async (stream) => {
+    const response = streamSSE(c, async (stream) => {
       try {
         if (result.metadata.memorySources.length > 0) {
           await stream.writeSSE({
@@ -304,6 +329,7 @@ chatRouter.post("/stream", async (c) => {
           switch (chunk.type) {
             case "text-delta": {
               accumulatedText += chunk.textDelta
+              appendPersistedTextPart(accumulatedResponseParts, chunk.textDelta)
               await stream.writeSSE({
                 event: "text",
                 data: JSON.stringify({ text: chunk.textDelta }),
@@ -342,6 +368,7 @@ chatRouter.post("/stream", async (c) => {
               break
             }
             case "tool-call": {
+              appendPersistedToolPart(accumulatedResponseParts, chunk.toolCallId)
               accumulatedToolCalls.set(chunk.toolCallId, {
                 id: chunk.toolCallId,
                 name: chunk.toolName,
@@ -359,6 +386,7 @@ chatRouter.post("/stream", async (c) => {
               break
             }
             case "tool-result": {
+              appendPersistedToolPart(accumulatedResponseParts, chunk.toolCallId)
               const clientResult = AGENT_SKILL_TOOL_NAMES.has(chunk.toolName)
                 ? chunk.toolName === "activate_skill"
                   ? "Agent Skill instructions loaded."
@@ -502,6 +530,9 @@ chatRouter.post("/stream", async (c) => {
               ...(accumulatedToolCalls.size > 0
                 ? { toolCalls: [...accumulatedToolCalls.values()] }
                 : {}),
+              ...(accumulatedResponseParts.length > 0
+                ? { responseParts: accumulatedResponseParts }
+                : {}),
               model,
               usage: finalUsage,
               failed: isFailed,
@@ -542,6 +573,9 @@ chatRouter.post("/stream", async (c) => {
         }
       }
     })
+    c.header("Cache-Control", "no-cache, no-transform")
+    c.header("X-Accel-Buffering", "no")
+    return response
   } catch (err) {
     await toolSet.close()
     const errorMsg = err instanceof Error ? err.message : "Orchestration failed"

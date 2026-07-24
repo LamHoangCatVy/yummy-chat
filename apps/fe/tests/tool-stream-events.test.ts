@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest"
 import {
+  appendResponseText,
+  appendResponseToolCall,
   applyToolStreamEvent,
   parseToolStreamEvent,
 } from "../src/components/chat/tool-stream-events"
@@ -100,6 +102,34 @@ describe("MCP tool stream events", () => {
         status: "error",
         result: "Timed out",
       },
+    ])
+  })
+
+  test("preserves interleaved text and tool calls in execution order", () => {
+    let parts = appendResponseText([], "Let me find the library ID.")
+    parts = appendResponseToolCall(parts, "call-resolve")
+    parts = appendResponseText(parts, "Now let me query the documentation.")
+    parts = appendResponseToolCall(parts, "call-query")
+    parts = appendResponseText(parts, "Here is what I found.")
+
+    expect(parts).toEqual([
+      { type: "text", content: "Let me find the library ID." },
+      { type: "tool-call", toolCallId: "call-resolve" },
+      { type: "text", content: "Now let me query the documentation." },
+      { type: "tool-call", toolCallId: "call-query" },
+      { type: "text", content: "Here is what I found." },
+    ])
+  })
+
+  test("coalesces adjacent text deltas and de-duplicates tool lifecycle events", () => {
+    let parts = appendResponseText([], "Hello")
+    parts = appendResponseText(parts, " world")
+    parts = appendResponseToolCall(parts, "call-1")
+    parts = appendResponseToolCall(parts, "call-1")
+
+    expect(parts).toEqual([
+      { type: "text", content: "Hello world" },
+      { type: "tool-call", toolCallId: "call-1" },
     ])
   })
 })

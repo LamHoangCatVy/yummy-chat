@@ -1,5 +1,11 @@
 import type { MessageListItem } from "@/lib/api"
-import type { ChatMessage, FileAttachment, MemorySource, ToolCallActivity } from "./types"
+import type {
+  AssistantResponsePart,
+  ChatMessage,
+  FileAttachment,
+  MemorySource,
+  ToolCallActivity,
+} from "./types"
 
 export function stripGeneratedJsonBlocks(text: string): string {
   return text
@@ -12,6 +18,7 @@ export function mapMessageListItemToChatMessage(m: MessageListItem): ChatMessage
   const reasoningContent =
     typeof m.metadata?.reasoningContent === "string" ? m.metadata.reasoningContent : undefined
   const toolCalls = parseToolCalls(m.metadata?.toolCalls)
+  const responseParts = parseResponseParts(m.metadata?.responseParts)
   const memorySources = parseMemorySources(m.metadata?.memorySources)
 
   const base: ChatMessage = {
@@ -22,6 +29,7 @@ export function mapMessageListItemToChatMessage(m: MessageListItem): ChatMessage
     createdAt: m.createdAt,
     ...(reasoningContent !== undefined ? { reasoningContent } : {}),
     ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(responseParts.length > 0 ? { responseParts } : {}),
     ...(memorySources.length > 0 ? { memorySources } : {}),
   }
 
@@ -118,6 +126,30 @@ function parseToolCalls(value: unknown): readonly ToolCallActivity[] {
       },
     ]
   })
+}
+
+function parseResponseParts(value: unknown): readonly AssistantResponsePart[] {
+  if (!Array.isArray(value)) return []
+
+  const responseParts: AssistantResponsePart[] = []
+  for (const part of value) {
+    if (!isRecord(part)) continue
+
+    if (part.type === "text" && typeof part.content === "string" && part.content.length > 0) {
+      responseParts.push({ type: "text", content: part.content })
+      continue
+    }
+
+    if (
+      part.type === "tool-call" &&
+      typeof part.toolCallId === "string" &&
+      part.toolCallId.length > 0
+    ) {
+      responseParts.push({ type: "tool-call", toolCallId: part.toolCallId })
+    }
+  }
+
+  return responseParts
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

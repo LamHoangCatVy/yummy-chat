@@ -9,7 +9,14 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { stripGeneratedJsonBlocks } from "./chat-transcript-helpers"
 import { ToolActivity } from "./tool-activity"
-import type { ChatMessage, FileAttachment, MemoryProposalRequest, MemorySource } from "./types"
+import type {
+  AssistantResponsePart,
+  ChatMessage,
+  FileAttachment,
+  MemoryProposalRequest,
+  MemorySource,
+  ToolCallActivity,
+} from "./types"
 import { useTypewriter } from "./use-typewriter"
 
 interface ChatTranscriptProps {
@@ -27,6 +34,7 @@ interface ChatTranscriptProps {
  */
 export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const prevMessageCountRef = useRef(0)
   const lastMessageContentLengthRef = useRef(0)
@@ -75,6 +83,20 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
     }
   }, [])
 
+  useEffect(() => {
+    const content = contentRef.current
+    if (!content || typeof ResizeObserver === "undefined") return
+
+    const observer = new ResizeObserver(() => {
+      if (isAtBottomRef.current) {
+        requestAnimationFrame(scrollToBottom)
+      }
+    })
+    observer.observe(content)
+
+    return () => observer.disconnect()
+  }, [scrollToBottom])
+
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center px-spacing-6">
@@ -85,7 +107,10 @@ export function ChatTranscript({ messages, userName }: ChatTranscriptProps) {
 
   return (
     <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-[48rem] px-spacing-4 pb-spacing-6 pt-spacing-8">
+      <div
+        ref={contentRef}
+        className="mx-auto max-w-[48rem] px-spacing-4 pb-spacing-6 pt-spacing-8"
+      >
         {messages.map((message) => (
           <MessageRow key={message.id} message={message} />
         ))}
@@ -117,6 +142,10 @@ function MessageRow({
 }) {
   const isUser = message.role === "user"
   const displayContent = isUser ? message.content : stripGeneratedJsonBlocks(message.content)
+  const animateResponseRef = useRef(message.isStreaming)
+  if (message.isStreaming) {
+    animateResponseRef.current = true
+  }
 
   if (isUser) {
     return (
@@ -139,16 +168,33 @@ function MessageRow({
     <div className="mb-spacing-8">
       <div className="text-justify text-[0.9375rem] leading-[1.7] text-text-primary">
         {message.reasoningContent && (
-          <ThinkingPanel reasoning={message.reasoningContent} isStreaming={message.isStreaming} />
+          <ThinkingPanel
+            reasoning={message.reasoningContent}
+            isStreaming={message.isStreaming}
+            animateResponse={animateResponseRef.current}
+          />
         )}
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <ToolActivity toolCalls={message.toolCalls} />
+        {message.responseParts && message.responseParts.length > 0 ? (
+          <AssistantResponseTimeline
+            parts={message.responseParts}
+            toolCalls={message.toolCalls ?? []}
+            isStreaming={message.isStreaming}
+            animateResponse={animateResponseRef.current}
+            hasReasoning={!!message.reasoningContent}
+          />
+        ) : (
+          <>
+            {message.toolCalls && message.toolCalls.length > 0 && (
+              <ToolActivity toolCalls={message.toolCalls} />
+            )}
+            <AssistantMessageContent
+              content={displayContent}
+              isStreaming={message.isStreaming}
+              animateResponse={animateResponseRef.current}
+              hasReasoning={!!message.reasoningContent}
+            />
+          </>
         )}
-        <AssistantMessageContent
-          content={displayContent}
-          isStreaming={message.isStreaming}
-          hasReasoning={!!message.reasoningContent}
-        />
       </div>
       {message.memorySources && message.memorySources.length > 0 && (
         <MemorySources sources={message.memorySources} />
@@ -157,6 +203,42 @@ function MessageRow({
       {message.files && message.files.length > 0 && <FileDownloads files={message.files} />}
     </div>
   )
+}
+
+function AssistantResponseTimeline({
+  parts,
+  toolCalls,
+  isStreaming,
+  animateResponse,
+  hasReasoning,
+}: {
+  readonly parts: readonly AssistantResponsePart[]
+  readonly toolCalls: readonly ToolCallActivity[]
+  readonly isStreaming: boolean
+  readonly animateResponse: boolean
+  readonly hasReasoning: boolean
+}) {
+  const toolCallsById = new Map(toolCalls.map((toolCall) => [toolCall.id, toolCall]))
+
+  return parts.map((part, index) => {
+    if (part.type === "tool-call") {
+      const toolCall = toolCallsById.get(part.toolCallId)
+      return toolCall ? <ToolActivity key={part.toolCallId} toolCalls={[toolCall]} /> : null
+    }
+
+    const isActivePart = isStreaming && index === parts.length - 1
+    return (
+      // biome-ignore lint/suspicious/noArrayIndexKey: Response parts are append-only, so the text-part index is stable.
+      <div key={`text-${index}`} className={index < parts.length - 1 ? "mb-spacing-3" : undefined}>
+        <AssistantMessageContent
+          content={stripGeneratedJsonBlocks(part.content)}
+          isStreaming={isActivePart}
+          animateResponse={animateResponse}
+          hasReasoning={hasReasoning}
+        />
+      </div>
+    )
+  })
 }
 
 function MemorySources({ sources }: { readonly sources: readonly MemorySource[] }) {
@@ -277,13 +359,15 @@ function MemoryProposalCard({ proposal }: { readonly proposal: MemoryProposalReq
 function AssistantMessageContent({
   content,
   isStreaming,
+  animateResponse,
   hasReasoning,
 }: {
   readonly content: string
   readonly isStreaming: boolean
+  readonly animateResponse: boolean
   readonly hasReasoning: boolean
 }) {
-  const { text: typedText, isTyping } = useTypewriter(content, isStreaming)
+  const { text: typedText, isTyping } = useTypewriter(content, animateResponse)
 
   if (content.length === 0 && isStreaming) {
     return hasReasoning ? null : <TypingIndicator />
@@ -363,26 +447,29 @@ function TypingIndicator() {
 function ThinkingPanel({
   reasoning,
   isStreaming,
+  animateResponse,
 }: {
   readonly reasoning: string
   readonly isStreaming: boolean
+  readonly animateResponse: boolean
 }) {
   const [collapsed, setCollapsed] = useState(false)
-  const { text: typedReasoning, isTyping } = useTypewriter(reasoning, isStreaming)
-  const visible = isStreaming || !collapsed
+  const { text: typedReasoning, isTyping } = useTypewriter(reasoning, animateResponse)
+  const visuallyStreaming = isStreaming || isTyping
+  const visible = visuallyStreaming || !collapsed
 
   return (
     <div className="mb-spacing-3">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
-        disabled={isStreaming}
+        disabled={visuallyStreaming}
         className="flex items-center gap-spacing-2 text-[0.8125rem] font-medium text-text-secondary transition-colors hover:text-text-primary disabled:hover:text-text-secondary"
         aria-expanded={visible}
       >
         <Brain size={14} />
-        <span>{isStreaming ? "Thinking" : "Thought process"}</span>
-        {isStreaming ? (
+        <span>{visuallyStreaming ? "Thinking" : "Thought process"}</span>
+        {visuallyStreaming ? (
           <ThinkingDots />
         ) : (
           <ChevronDown

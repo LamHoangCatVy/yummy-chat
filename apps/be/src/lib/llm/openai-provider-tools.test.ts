@@ -26,6 +26,9 @@ describe("OpenAIProvider MCP tool loop", () => {
       .mockResolvedValueOnce(
         streamOf([
           {
+            choices: [{ delta: { content: "Let me check the weather." }, finish_reason: null }],
+          },
+          {
             choices: [
               {
                 delta: {
@@ -72,6 +75,17 @@ describe("OpenAIProvider MCP tool loop", () => {
     }
 
     expect(executeTool).toHaveBeenCalledWith("mcp_123_weather", { city: "Hanoi" })
+    expect(chunks.map((chunk) => chunk.type)).toEqual([
+      "text-delta",
+      "tool-call",
+      "tool-result",
+      "text-delta",
+      "finish",
+    ])
+    expect(chunks[0]).toEqual({
+      type: "text-delta",
+      textDelta: "Let me check the weather.",
+    })
     expect(chunks).toContainEqual({ type: "text-delta", textDelta: "Sunny" })
     expect(chunks).toContainEqual({
       type: "tool-result",

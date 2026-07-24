@@ -4,7 +4,12 @@ import { listMemoryEvents, listMessages } from "@/lib/api"
 import { API_V1, memorySourceSchema } from "@yummy/shared"
 import { useCallback, useRef, useState } from "react"
 import { mapMessageListItemToChatMessage } from "./chat-transcript-helpers"
-import { applyToolStreamEvent, parseToolStreamEvent } from "./tool-stream-events"
+import {
+  appendResponseText,
+  appendResponseToolCall,
+  applyToolStreamEvent,
+  parseToolStreamEvent,
+} from "./tool-stream-events"
 import type { ChatMessage, FileAttachment, MemoryProposalRequest, StreamStatus } from "./types"
 
 interface UseStreamChatOptions {
@@ -109,6 +114,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
         id: assistantId,
         role: "assistant",
         content: "",
+        responseParts: [],
         isStreaming: true,
         createdAt: new Date().toISOString(),
       }
@@ -206,7 +212,13 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                   const textDelta = (parsed as { text: string }).text
                   setMessages((prev) =>
                     prev.map((m) =>
-                      m.id === assistantId ? { ...m, content: m.content + textDelta } : m,
+                      m.id === assistantId
+                        ? {
+                            ...m,
+                            content: m.content + textDelta,
+                            responseParts: appendResponseText(m.responseParts ?? [], textDelta),
+                          }
+                        : m,
                     ),
                   )
                 } else if (
@@ -234,6 +246,10 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                         ? {
                             ...m,
                             toolCalls: applyToolStreamEvent(m.toolCalls ?? [], toolEvent),
+                            responseParts: appendResponseToolCall(
+                              m.responseParts ?? [],
+                              toolEvent.payload.toolCallId,
+                            ),
                             ...(memoryProposal ? { memoryProposal } : {}),
                           }
                         : m,

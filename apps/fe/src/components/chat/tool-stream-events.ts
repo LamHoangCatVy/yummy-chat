@@ -1,4 +1,9 @@
-import type { StreamToolCallEvent, StreamToolResultEvent, ToolCallActivity } from "./types"
+import type {
+  AssistantResponsePart,
+  StreamToolCallEvent,
+  StreamToolResultEvent,
+  ToolCallActivity,
+} from "./types"
 
 export type ToolStreamEvent =
   | { readonly type: "tool-call"; readonly payload: StreamToolCallEvent }
@@ -67,6 +72,37 @@ export function applyToolStreamEvent(
   }
 
   return current.map((toolCall, index) => (index === existingIndex ? next : toolCall))
+}
+
+export function appendResponseText(
+  current: readonly AssistantResponsePart[],
+  textDelta: string,
+): readonly AssistantResponsePart[] {
+  if (!textDelta) return current
+
+  const last = current.at(-1)
+  if (last?.type === "text") {
+    return [
+      ...current.slice(0, -1),
+      {
+        type: "text",
+        content: last.content + textDelta,
+      },
+    ]
+  }
+
+  return [...current, { type: "text", content: textDelta }]
+}
+
+export function appendResponseToolCall(
+  current: readonly AssistantResponsePart[],
+  toolCallId: string,
+): readonly AssistantResponsePart[] {
+  if (current.some((part) => part.type === "tool-call" && part.toolCallId === toolCallId)) {
+    return current
+  }
+
+  return [...current, { type: "tool-call", toolCallId }]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

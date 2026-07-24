@@ -150,6 +150,25 @@ describe("chat history file metadata", () => {
     ])
   })
 
+  test("mapMessageListItemToChatMessage restores the persisted response timeline", () => {
+    const chatMessage = mapMessageListItemToChatMessage({
+      ...baseMessage,
+      metadata: {
+        responseParts: [
+          { type: "text", content: "Let me resolve the library." },
+          { type: "tool-call", toolCallId: "call-1" },
+          { type: "text", content: "Now I will query the docs." },
+        ],
+      },
+    })
+
+    expect(chatMessage.responseParts).toEqual([
+      { type: "text", content: "Let me resolve the library." },
+      { type: "tool-call", toolCallId: "call-1" },
+      { type: "text", content: "Now I will query the docs." },
+    ])
+  })
+
   test("mapMessageListItemToChatMessage ignores malformed MCP metadata", () => {
     const chatMessage = mapMessageListItemToChatMessage({
       ...baseMessage,
@@ -169,4 +188,21 @@ describe("chat history file metadata", () => {
 
     expect(chatMessage.toolCalls).toBeUndefined()
   })
+
+  test("mapMessageListItemToChatMessage ignores malformed response parts", () => {
+    const chatMessage = mapMessageListItemToChatMessage({
+      ...baseMessage,
+      metadata: {
+        responseParts: [
+          null,
+          { type: "text", content: 123 },
+          { type: "tool-call" },
+          { type: "unknown", content: "ignored" },
+        ],
+      },
+    })
+
+    expect(chatMessage.responseParts).toBeUndefined()
+  })
+
 })
