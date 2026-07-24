@@ -1,8 +1,10 @@
 import { serve } from "@hono/node-server"
 import { createApp } from "./app.js"
 import { env } from "./lib/env.js"
+import { startMemoryWorker } from "./lib/memory/jobs.js"
 
 const app = createApp()
+startMemoryWorker()
 
 const server = serve(
   {

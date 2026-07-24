@@ -51,6 +51,7 @@ describe("conversations API", () => {
   let cookiesA: string
   let cookiesB: string
   let conversationId: string
+  let temporaryConversationId: string
 
   describe("auth guard", () => {
     it("returns 401 without session", async () => {
@@ -76,6 +77,30 @@ describe("conversations API", () => {
       expect(body.data.title).toBe("My Chat")
       expect(typeof body.data.id).toBe("string")
       conversationId = body.data.id
+    })
+
+    it("creates a temporary conversation with an expiry", async () => {
+      const app = createApp()
+      const res = await app.request("/api/v1/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookiesA },
+        body: JSON.stringify({ title: "Private session", mode: "temporary" }),
+      })
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body.data.mode).toBe("temporary")
+      expect(new Date(body.data.expiresAt).getTime()).toBeGreaterThan(Date.now())
+      temporaryConversationId = body.data.id
+    })
+
+    it("rejects an invalid conversation mode", async () => {
+      const app = createApp()
+      const res = await app.request("/api/v1/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookiesA },
+        body: JSON.stringify({ title: "Invalid", mode: "incognito-ish" }),
+      })
+      expect(res.status).toBe(400)
     })
 
     it("rejects empty title", async () => {
@@ -122,6 +147,11 @@ describe("conversations API", () => {
       expect(body.success).toBe(true)
       expect(Array.isArray(body.data.conversations)).toBe(true)
       expect(body.data.conversations.length).toBeGreaterThanOrEqual(1)
+      expect(
+        body.data.conversations.some(
+          (conversation: { id: string }) => conversation.id === temporaryConversationId,
+        ),
+      ).toBe(false)
       expect(body.data.nextCursor === null || typeof body.data.nextCursor === "string").toBe(true)
     })
 

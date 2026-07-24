@@ -33,6 +33,21 @@ export const env = {
   get openaiModel(): string {
     return optionalEnv("OPENAI_MODEL", "gpt-5-nano")
   },
+  get memoryApiKey(): string | undefined {
+    return process.env.MEMORY_API_KEY || process.env.OPENAI_API_KEY
+  },
+  get memoryBaseUrl(): string {
+    return optionalEnv("MEMORY_BASE_URL", "https://api.openai.com/v1")
+  },
+  get memoryExtractionModel(): string {
+    return optionalEnv("MEMORY_EXTRACTION_MODEL", "gpt-5-nano")
+  },
+  get memoryEmbeddingModel(): string {
+    return optionalEnv("MEMORY_EMBEDDING_MODEL", "text-embedding-3-small")
+  },
+  get memoryV2Enabled(): boolean {
+    return process.env.MEMORY_V2_ENABLED !== "false"
+  },
   get appEnv(): string {
     return optionalEnv("APP_ENV", "development")
   },

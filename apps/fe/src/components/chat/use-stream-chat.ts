@@ -1,17 +1,21 @@
 "use client"
 
-import { listMessages } from "@/lib/api"
-import { API_V1 } from "@yummy/shared"
+import { listMemoryEvents, listMessages } from "@/lib/api"
+import { API_V1, memorySourceSchema } from "@yummy/shared"
 import { useCallback, useRef, useState } from "react"
 import { mapMessageListItemToChatMessage } from "./chat-transcript-helpers"
 import { applyToolStreamEvent, parseToolStreamEvent } from "./tool-stream-events"
-import type { ChatMessage, FileAttachment, StreamStatus } from "./types"
+import type { ChatMessage, FileAttachment, MemoryProposalRequest, StreamStatus } from "./types"
 
 interface UseStreamChatOptions {
   /** Called when a streaming error occurs (for toast/notification). */
   onError?: (error: string) => void
   /** Called after the first assistant response in a conversation completes. */
   onFirstExchangeComplete?: () => void
+  /** Called when the background memory worker creates or updates a memory. */
+  onMemoryUpdated?: (message: string) => void
+  /** Temporary conversations disable memory event polling. */
+  pollMemoryUpdates?: boolean
 }
 
 interface UseStreamChatReturn {
@@ -114,6 +118,8 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
 
       const controller = new AbortController()
       abortRef.current = controller
+      const streamStartedAt = new Date().toISOString()
+      const shouldPollMemory = optionsRef.current.pollMemoryUpdates !== false
 
       try {
         const response = await fetch(`${API_V1.CHAT}/stream`, {
@@ -138,14 +144,14 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                 : m,
             ),
           )
-          options.onError?.(`Request failed (${response.status})`)
+          optionsRef.current.onError?.(`Request failed (${response.status})`)
           return
         }
 
         const reader = response.body?.getReader()
         if (!reader) {
           setStatus("error")
-          options.onError?.("No response body")
+          optionsRef.current.onError?.("No response body")
           return
         }
 
@@ -171,8 +177,27 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 const parsed: unknown = JSON.parse(data)
                 const toolEvent = parseToolStreamEvent(parsed)
+                const memorySources =
+                  typeof parsed === "object" && parsed !== null && "sources" in parsed
+                    ? memorySourceSchema.array().safeParse(parsed.sources)
+                    : null
 
-                if (
+                if (memorySources?.success) {
+                  const normalizedSources = memorySources.data.map((source) => ({
+                    kind: source.kind,
+                    id: source.id,
+                    label: source.label,
+                    ...(source.conversationId !== undefined
+                      ? { conversationId: source.conversationId }
+                      : {}),
+                    ...(source.excerpt !== undefined ? { excerpt: source.excerpt } : {}),
+                  }))
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId ? { ...m, memorySources: normalizedSources } : m,
+                    ),
+                  )
+                } else if (
                   typeof parsed === "object" &&
                   parsed !== null &&
                   "text" in parsed &&
@@ -202,12 +227,14 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                     ),
                   )
                 } else if (toolEvent) {
+                  const memoryProposal = parseMemoryProposal(toolEvent)
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === assistantId
                         ? {
                             ...m,
                             toolCalls: applyToolStreamEvent(m.toolCalls ?? [], toolEvent),
+                            ...(memoryProposal ? { memoryProposal } : {}),
                           }
                         : m,
                     ),
@@ -244,7 +271,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
                         : m,
                     ),
                   )
-                  options.onError?.(errorMsg)
+                  optionsRef.current.onError?.(errorMsg)
                 }
               } catch {
                 // Skip unparseable SSE data lines
@@ -258,6 +285,11 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
           prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)),
         )
         setStatus("done")
+        if (shouldPollMemory) {
+          void pollForMemoryUpdate(streamStartedAt, (message) =>
+            optionsRef.current.onMemoryUpdated?.(message),
+          )
+        }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
           // User-initiated abort — mark message as stopped
@@ -277,13 +309,68 @@ export function useStreamChat(options: UseStreamChatOptions = {}): UseStreamChat
               : m,
           ),
         )
-        options.onError?.(message)
+        optionsRef.current.onError?.(message)
       } finally {
         abortRef.current = null
       }
     },
-    [options],
+    [],
   )
 
   return { messages, status, sendMessage, stop, clear, loadMessages }
+}
+
+function parseMemoryProposal(
+  event: ReturnType<typeof parseToolStreamEvent>,
+): MemoryProposalRequest | null {
+  if (
+    event?.type !== "tool-result" ||
+    event.payload.toolName !== "remember_memory" ||
+    event.payload.isError
+  ) {
+    return null
+  }
+  try {
+    const value: unknown = JSON.parse(event.payload.content)
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !("status" in value) ||
+      value.status !== "confirmation_required" ||
+      !("proposalId" in value) ||
+      typeof value.proposalId !== "string" ||
+      !("key" in value) ||
+      typeof value.key !== "string" ||
+      !("value" in value) ||
+      typeof value.value !== "string" ||
+      !("category" in value) ||
+      typeof value.category !== "string"
+    ) {
+      return null
+    }
+    return {
+      id: value.proposalId,
+      key: value.key,
+      value: value.value,
+      category: value.category,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function pollForMemoryUpdate(after: string, onUpdate: (message: string) => void) {
+  for (const delayMs of [750, 1_500, 3_000]) {
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+    try {
+      const result = await listMemoryEvents(after)
+      const event = result.events.at(-1)
+      if (!event) continue
+      const action = event.type === "created" ? "saved" : event.type
+      onUpdate(event.key ? `Memory ${action}: ${event.key}` : `Memory ${action}`)
+      return
+    } catch {
+      // Memory notifications are best effort and never interrupt the chat stream.
+    }
+  }
 }

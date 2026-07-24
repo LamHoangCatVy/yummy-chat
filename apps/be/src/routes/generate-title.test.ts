@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http"
+import { type Server, createServer } from "node:http"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { encrypt } from "../lib/encryption"
 import { createTestDatabase } from "../test/db"
@@ -198,7 +198,10 @@ describe("generate title API", () => {
       const assistantRes = await app.request(`/api/v1/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Cookie: cookies },
-        body: JSON.stringify({ role: "assistant", content: "Model routing chooses request body model." }),
+        body: JSON.stringify({
+          role: "assistant",
+          content: "Model routing chooses request body model.",
+        }),
       })
       expect(assistantRes.status).toBe(201)
 

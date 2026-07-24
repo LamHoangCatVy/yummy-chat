@@ -1,3 +1,4 @@
+import type { UserId } from "@yummy/shared"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createTestDatabase } from "../test/db"
 
@@ -7,6 +8,7 @@ process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
 
 const { createApp } = await import("../app")
+const { createMemoryProposal } = await import("../lib/memory/service")
 
 function extractCookies(res: Response): string {
   return res.headers
@@ -36,7 +38,7 @@ async function enableMemory(app: ReturnType<typeof createApp>, cookies: string):
   await app.request("/api/v1/memory/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: cookies },
-    body: JSON.stringify({ enabled: true }),
+    body: JSON.stringify({ savedMemoryEnabled: true, chatHistoryEnabled: true }),
   })
 }
 
@@ -85,7 +87,8 @@ describe("memory API", () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.success).toBe(true)
-      expect(body.data.enabled).toBe(false)
+      expect(body.data.savedMemoryEnabled).toBe(false)
+      expect(body.data.chatHistoryEnabled).toBe(false)
     })
   })
 
@@ -95,12 +98,13 @@ describe("memory API", () => {
       const res = await app.request("/api/v1/memory/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Cookie: cookiesA },
-        body: JSON.stringify({ enabled: true }),
+        body: JSON.stringify({ savedMemoryEnabled: true, chatHistoryEnabled: true }),
       })
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.success).toBe(true)
-      expect(body.data.enabled).toBe(true)
+      expect(body.data.savedMemoryEnabled).toBe(true)
+      expect(body.data.chatHistoryEnabled).toBe(true)
     })
 
     it("reflects updated value on GET", async () => {
@@ -110,7 +114,8 @@ describe("memory API", () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.data.enabled).toBe(true)
+      expect(body.data.savedMemoryEnabled).toBe(true)
+      expect(body.data.chatHistoryEnabled).toBe(true)
     })
 
     it("disables memory", async () => {
@@ -118,13 +123,14 @@ describe("memory API", () => {
       await app.request("/api/v1/memory/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Cookie: cookiesA },
-        body: JSON.stringify({ enabled: false }),
+        body: JSON.stringify({ savedMemoryEnabled: false, chatHistoryEnabled: true }),
       })
       const res = await app.request("/api/v1/memory/settings", {
         headers: { Cookie: cookiesA },
       })
       const body = await res.json()
-      expect(body.data.enabled).toBe(false)
+      expect(body.data.savedMemoryEnabled).toBe(false)
+      expect(body.data.chatHistoryEnabled).toBe(false)
     })
 
     it("rejects invalid body", async () => {
@@ -132,7 +138,7 @@ describe("memory API", () => {
       const res = await app.request("/api/v1/memory/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Cookie: cookiesA },
-        body: JSON.stringify({ enabled: "yes" }),
+        body: JSON.stringify({ savedMemoryEnabled: "yes", chatHistoryEnabled: false }),
       })
       expect(res.status).toBe(400)
       const body = await res.json()
@@ -245,6 +251,65 @@ describe("memory API", () => {
         body: JSON.stringify({ key: "api_key", value: "sk-xxx", category: "credential" }),
       })
       expect(res.status).toBe(400)
+    })
+  })
+
+  describe("sensitive memory proposals", () => {
+    async function userAId(): Promise<UserId> {
+      const rows = await testDatabase.sql<{ id: string }[]>`
+        SELECT id FROM "user" WHERE email = ${userA.email}
+      `
+      return rows[0]?.id as UserId
+    }
+
+    it("requires a one-time confirmation before saving", async () => {
+      const proposal = await createMemoryProposal({
+        userId: await userAId(),
+        key: "dietary health preference",
+        value: "low sodium",
+        category: "health",
+        confidence: 1,
+        importance: 1,
+        origin: "explicit",
+      })
+      const app = createApp()
+      const res = await app.request(`/api/v1/memory/proposals/${proposal?.id}/confirm`, {
+        method: "POST",
+        headers: { Cookie: cookiesA },
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.data.key).toBe("dietary health preference")
+
+      const duplicate = await app.request(`/api/v1/memory/proposals/${proposal?.id}/confirm`, {
+        method: "POST",
+        headers: { Cookie: cookiesA },
+      })
+      expect(duplicate.status).toBe(404)
+    })
+
+    it("does not save a cancelled proposal", async () => {
+      const proposal = await createMemoryProposal({
+        userId: await userAId(),
+        key: "medical preference",
+        value: "private value",
+        category: "health",
+        confidence: 1,
+        importance: 1,
+        origin: "explicit",
+      })
+      const app = createApp()
+      const cancelled = await app.request(`/api/v1/memory/proposals/${proposal?.id}`, {
+        method: "DELETE",
+        headers: { Cookie: cookiesA },
+      })
+      expect(cancelled.status).toBe(200)
+
+      const confirm = await app.request(`/api/v1/memory/proposals/${proposal?.id}/confirm`, {
+        method: "POST",
+        headers: { Cookie: cookiesA },
+      })
+      expect(confirm.status).toBe(404)
     })
   })
 
@@ -468,13 +533,14 @@ describe("memory API", () => {
       await app.request("/api/v1/memory/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Cookie: cookiesB },
-        body: JSON.stringify({ enabled: false }),
+        body: JSON.stringify({ savedMemoryEnabled: false, chatHistoryEnabled: false }),
       })
       const res = await app.request("/api/v1/memory/settings", {
         headers: { Cookie: cookiesB },
       })
       const body = await res.json()
-      expect(body.data.enabled).toBe(false)
+      expect(body.data.savedMemoryEnabled).toBe(false)
+      expect(body.data.chatHistoryEnabled).toBe(false)
     })
   })
 })

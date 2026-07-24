@@ -5,6 +5,7 @@ import {
   conversationSkillSnapshot,
   generatedChatFile,
   memoryEntry,
+  memoryEvent,
   message,
   skill,
   skillResource,
@@ -35,11 +36,14 @@ export interface PaginatedResult<T> {
 export function conversationRepository(actor: Actor) {
   return {
     list(): Promise<ConversationRow[]> {
-      return db.select().from(conversation).where(eq(conversation.userId, actor.userId))
+      return db
+        .select()
+        .from(conversation)
+        .where(and(eq(conversation.userId, actor.userId), eq(conversation.mode, "standard")))
     },
 
     listPaginated(limit: number, cursor?: string): Promise<PaginatedResult<ConversationRow>> {
-      const conditions = [eq(conversation.userId, actor.userId)]
+      const conditions = [eq(conversation.userId, actor.userId), eq(conversation.mode, "standard")]
       if (cursor) {
         conditions.push(lt(conversation.id, cursor))
       }
@@ -71,6 +75,8 @@ export function conversationRepository(actor: Actor) {
     create(data: {
       id: ConversationId
       title: string
+      mode?: "standard" | "temporary"
+      expiresAt?: Date | null
     }): Promise<ConversationRow | undefined> {
       return db
         .insert(conversation)
@@ -78,6 +84,8 @@ export function conversationRepository(actor: Actor) {
           id: data.id,
           userId: actor.userId,
           title: data.title,
+          mode: data.mode ?? "standard",
+          expiresAt: data.expiresAt ?? null,
         })
         .returning()
         .then((rows) => rows[0])
@@ -171,7 +179,11 @@ export function messageRepository(conversationId: ConversationId) {
 export function memoryRepository(actor: Actor) {
   return {
     list(): Promise<MemoryEntryRow[]> {
-      return db.select().from(memoryEntry).where(eq(memoryEntry.userId, actor.userId))
+      return db
+        .select()
+        .from(memoryEntry)
+        .where(and(eq(memoryEntry.userId, actor.userId), eq(memoryEntry.status, "active")))
+        .orderBy(desc(memoryEntry.updatedAt))
     },
 
     getById(id: MemoryId): Promise<MemoryEntryRow | undefined> {
@@ -182,32 +194,66 @@ export function memoryRepository(actor: Actor) {
         .then((rows) => rows[0])
     },
 
-    upsert(data: {
+    async upsert(data: {
       id: MemoryId
       key: string
       value: string
       category?: string | null
       source?: string | null
       confidence?: number | null
+      importance?: number
+      origin?: "manual" | "explicit" | "automatic"
+      sourceConversationId?: string | null
+      sourceMessageId?: string | null
     }): Promise<MemoryEntryRow | undefined> {
-      const setData: Record<string, unknown> = { value: data.value, updatedAt: new Date() }
+      const normalizedKey = normalizeMemoryKey(data.key)
+      const setData: Record<string, unknown> = {
+        key: data.key,
+        normalizedKey,
+        value: data.value,
+        status: "active",
+        updatedAt: new Date(),
+      }
       if (data.category !== undefined) setData.category = data.category
       if (data.source !== undefined) setData.source = data.source
       if (data.confidence !== undefined) setData.confidence = data.confidence
-      if (data.key !== undefined) setData.key = data.key
+      if (data.importance !== undefined) setData.importance = data.importance
+      if (data.origin !== undefined) setData.origin = data.origin
+      if (data.sourceConversationId !== undefined) {
+        setData.sourceConversationId = data.sourceConversationId
+      }
+      if (data.sourceMessageId !== undefined) setData.sourceMessageId = data.sourceMessageId
+      const existingById = await db
+        .select({ id: memoryEntry.id })
+        .from(memoryEntry)
+        .where(and(eq(memoryEntry.id, data.id), eq(memoryEntry.userId, actor.userId)))
+        .then((rows) => rows[0])
+      if (existingById) {
+        return db
+          .update(memoryEntry)
+          .set(setData)
+          .where(eq(memoryEntry.id, existingById.id))
+          .returning()
+          .then((rows) => rows[0])
+      }
       return db
         .insert(memoryEntry)
         .values({
           id: data.id,
           userId: actor.userId,
           key: data.key,
+          normalizedKey,
           value: data.value,
           category: data.category ?? null,
           source: data.source ?? null,
+          origin: data.origin ?? "manual",
           confidence: data.confidence ?? null,
+          importance: data.importance ?? 0.5,
+          sourceConversationId: data.sourceConversationId ?? null,
+          sourceMessageId: data.sourceMessageId ?? null,
         })
         .onConflictDoUpdate({
-          target: memoryEntry.id,
+          target: [memoryEntry.userId, memoryEntry.normalizedKey],
           set: setData,
         })
         .returning()
@@ -222,11 +268,28 @@ export function memoryRepository(actor: Actor) {
         .then((rows) => rows.length > 0)
     },
 
+    clear(): Promise<number> {
+      return db
+        .delete(memoryEntry)
+        .where(eq(memoryEntry.userId, actor.userId))
+        .returning({ id: memoryEntry.id })
+        .then((rows) => rows.length)
+    },
+
+    listEvents(after?: Date) {
+      const conditions = [eq(memoryEvent.userId, actor.userId)]
+      if (after) conditions.push(gt(memoryEvent.createdAt, after))
+      return db
+        .select()
+        .from(memoryEvent)
+        .where(and(...conditions))
+        .orderBy(memoryEvent.createdAt)
+        .limit(100)
+    },
+
     // ── Settings ─────────────────────────────────────────────────────────
 
-    getSettings(): Promise<
-      { id: string; userId: string; enabled: boolean; createdAt: Date; updatedAt: Date } | undefined
-    > {
+    getSettings(): Promise<typeof userMemorySettings.$inferSelect | undefined> {
       return db
         .select()
         .from(userMemorySettings)
@@ -235,24 +298,38 @@ export function memoryRepository(actor: Actor) {
     },
 
     upsertSettings(data: {
-      enabled: boolean
-    }): Promise<
-      { id: string; userId: string; enabled: boolean; createdAt: Date; updatedAt: Date } | undefined
-    > {
+      savedMemoryEnabled: boolean
+      chatHistoryEnabled: boolean
+    }): Promise<typeof userMemorySettings.$inferSelect | undefined> {
+      const chatHistoryEnabled = data.savedMemoryEnabled && data.chatHistoryEnabled
       return db
         .insert(userMemorySettings)
         .values({
           userId: actor.userId,
-          enabled: data.enabled,
+          savedMemoryEnabled: data.savedMemoryEnabled,
+          chatHistoryEnabled,
         })
         .onConflictDoUpdate({
           target: userMemorySettings.userId,
-          set: { enabled: data.enabled, updatedAt: new Date() },
+          set: {
+            savedMemoryEnabled: data.savedMemoryEnabled,
+            chatHistoryEnabled,
+            updatedAt: new Date(),
+          },
         })
         .returning()
         .then((rows) => rows[0])
     },
   }
+}
+
+function normalizeMemoryKey(key: string): string {
+  const normalized = key
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+  return normalized || `memory_${crypto.randomUUID()}`
 }
 
 // ── Skill repository (owner-scoped) ─────────────────────────────────────────

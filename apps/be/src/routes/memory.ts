@@ -11,6 +11,11 @@ import {
 import { Hono } from "hono"
 import { auditFromContext, emitAuditEvent } from "../lib/audit.js"
 import type { Actor } from "../lib/authz.js"
+import {
+  cancelMemoryProposal,
+  confirmMemoryProposal,
+  enqueueMemoryJob,
+} from "../lib/memory/service.js"
 import { memoryRepository } from "../lib/repositories.js"
 import { requireAuth } from "../middleware/auth-guard.js"
 import type { RequestIdVariables } from "../middleware/request-id.js"
@@ -46,9 +51,12 @@ memoryRouter.get("/settings", async (c) => {
   const repo = memoryRepository(actor)
   const settings = await repo.getSettings()
 
-  const res: ApiResponse<{ enabled: boolean }> = {
+  const res: ApiResponse<{ savedMemoryEnabled: boolean; chatHistoryEnabled: boolean }> = {
     success: true,
-    data: { enabled: settings?.enabled ?? false },
+    data: {
+      savedMemoryEnabled: settings?.savedMemoryEnabled ?? false,
+      chatHistoryEnabled: settings?.chatHistoryEnabled ?? false,
+    },
     meta: meta(c),
   }
   return c.json(res, 200)
@@ -92,7 +100,15 @@ memoryRouter.put("/settings", async (c) => {
 
   const actor = actorFrom(c)
   const repo = memoryRepository(actor)
-  const row = await repo.upsertSettings({ enabled: parsed.data.enabled })
+  const previous = await repo.getSettings()
+  const row = await repo.upsertSettings(parsed.data)
+  const chatHistoryEnabled = row?.chatHistoryEnabled ?? false
+
+  if (!previous?.chatHistoryEnabled && chatHistoryEnabled) {
+    await enqueueMemoryJob("backfill", actor.userId, {})
+  } else if (previous?.chatHistoryEnabled && !chatHistoryEnabled) {
+    await enqueueMemoryJob("purge_history", actor.userId, {})
+  }
 
   const ctx = auditFromContext(c)
   emitAuditEvent({
@@ -102,15 +118,119 @@ memoryRouter.put("/settings", async (c) => {
     user_agent: ctx.user_agent,
     request_id: ctx.request_id,
     outcome: "success",
-    details: { enabled: parsed.data.enabled },
+    details: {
+      savedMemoryEnabled: row?.savedMemoryEnabled ?? parsed.data.savedMemoryEnabled,
+      chatHistoryEnabled,
+    },
   })
 
-  const res: ApiResponse<{ enabled: boolean }> = {
+  const res: ApiResponse<{ savedMemoryEnabled: boolean; chatHistoryEnabled: boolean }> = {
     success: true,
-    data: { enabled: row?.enabled ?? parsed.data.enabled },
+    data: {
+      savedMemoryEnabled: row?.savedMemoryEnabled ?? parsed.data.savedMemoryEnabled,
+      chatHistoryEnabled,
+    },
     meta: meta(c),
   }
   return c.json(res, 200)
+})
+
+memoryRouter.get("/events", async (c) => {
+  const actor = actorFrom(c)
+  const afterParam = c.req.query("after")
+  const after = afterParam ? new Date(afterParam) : new Date(0)
+  if (Number.isNaN(after.getTime())) {
+    const res: ApiErrorResponse = {
+      success: false,
+      error: {
+        type: "VALIDATION_ERROR",
+        message: "Invalid after timestamp",
+        statusCode: 400,
+        fields: [{ field: "after", message: "Must be an ISO timestamp" }],
+      },
+      meta: meta(c),
+    }
+    return c.json(res, 400)
+  }
+  const events = await memoryRepository(actor).listEvents(after)
+  const res: ApiResponse<{ events: typeof events }> = {
+    success: true,
+    data: { events },
+    meta: meta(c),
+  }
+  return c.json(res, 200)
+})
+
+memoryRouter.post("/proposals/:id/confirm", async (c) => {
+  const id = c.req.param("id")
+  if (!memoryIdSchema.safeParse(id).success) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          type: "NOT_FOUND_ERROR",
+          message: "Proposal not found",
+          statusCode: 404,
+          resource: "memory proposal",
+        },
+        meta: meta(c),
+      } satisfies ApiErrorResponse,
+      404,
+    )
+  }
+  const row = await confirmMemoryProposal(actorFrom(c).userId, id)
+  if (!row) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          type: "NOT_FOUND_ERROR",
+          message: "Proposal not found",
+          statusCode: 404,
+          resource: "memory proposal",
+        },
+        meta: meta(c),
+      } satisfies ApiErrorResponse,
+      404,
+    )
+  }
+  return c.json({ success: true, data: row, meta: meta(c) } satisfies ApiResponse<typeof row>, 200)
+})
+
+memoryRouter.delete("/proposals/:id", async (c) => {
+  const id = c.req.param("id")
+  if (!memoryIdSchema.safeParse(id).success) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          type: "NOT_FOUND_ERROR",
+          message: "Proposal not found",
+          statusCode: 404,
+          resource: "memory proposal",
+        },
+        meta: meta(c),
+      } satisfies ApiErrorResponse,
+      404,
+    )
+  }
+  const cancelled = await cancelMemoryProposal(actorFrom(c).userId, id)
+  if (!cancelled) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          type: "NOT_FOUND_ERROR",
+          message: "Proposal not found",
+          statusCode: 404,
+          resource: "memory proposal",
+        },
+        meta: meta(c),
+      } satisfies ApiErrorResponse,
+      404,
+    )
+  }
+  return c.json({ success: true, data: { cancelled: true }, meta: meta(c) }, 200)
 })
 
 // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -120,12 +240,28 @@ memoryRouter.get("/", async (c) => {
   const repo = memoryRepository(actor)
   const entries = await repo.list()
 
-  const res: ApiResponse<{ entries: typeof entries }> = {
+  const res: ApiResponse<{ entries: typeof entries; nextCursor: null }> = {
     success: true,
-    data: { entries },
+    data: { entries, nextCursor: null },
     meta: meta(c),
   }
   return c.json(res, 200)
+})
+
+memoryRouter.delete("/", async (c) => {
+  const actor = actorFrom(c)
+  const deleted = await memoryRepository(actor).clear()
+  const ctx = auditFromContext(c)
+  emitAuditEvent({
+    event_type: "memory.delete",
+    user_id: actor.userId,
+    ip: ctx.ip,
+    user_agent: ctx.user_agent,
+    request_id: ctx.request_id,
+    outcome: "success",
+    details: { clearAll: true, deleted },
+  })
+  return c.json({ success: true, data: { deleted }, meta: meta(c) }, 200)
 })
 
 memoryRouter.post("/", async (c) => {

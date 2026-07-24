@@ -19,6 +19,8 @@ import type { UsageMetadata } from "../lib/llm/provider.js"
 import { combineProviderToolSets } from "../lib/llm/tool-set.js"
 import { extractXlsxJson, generateXlsxBuffer } from "../lib/llm/xlsx-generator.js"
 import { createMcpToolSet } from "../lib/mcp/client.js"
+import { enqueueMemoryJob } from "../lib/memory/service.js"
+import { createMemoryToolSet } from "../lib/memory/tool-set.js"
 import { redactString } from "../lib/redact.js"
 import {
   conversationRepository,
@@ -69,7 +71,6 @@ const chatStreamInputSchema = z.object({
   content: z.string().min(1).max(100_000),
   model: z.string().min(1).max(100).default("gpt-5-nano"),
   skillId: z.string().uuid().optional(),
-  memoryEnabled: z.boolean().optional().default(false),
 })
 
 // ── Provider resolution (per-request, request-scoped) ──────────────────────
@@ -155,7 +156,7 @@ chatRouter.post("/stream", async (c) => {
   }
 
   const actor = actorFrom(c)
-  const { conversationId, content, model, memoryEnabled } = parsed.data
+  const { conversationId, content, model } = parsed.data
   let { skillId } = parsed.data
 
   // Auto-load the conversation's stored skill if none was sent in the request
@@ -219,7 +220,12 @@ chatRouter.post("/stream", async (c) => {
     skillId ? (skillId as SkillId) : undefined,
   )
   const mcpToolSet = await createMcpToolSet(actor.userId)
-  const toolSet = combineProviderToolSets([agentSkillToolSet, mcpToolSet])
+  const memoryToolSet = await createMemoryToolSet(
+    actor,
+    conversationId as ConversationId,
+    conv.mode === "standard",
+  )
+  const toolSet = combineProviderToolSets([agentSkillToolSet, mcpToolSet, memoryToolSet])
   const orchestrator = createOrchestrator({
     provider,
     tools: toolSet.tools,
@@ -236,6 +242,7 @@ chatRouter.post("/stream", async (c) => {
   let accumulatedReasoning = ""
   const accumulatedToolCalls = new Map<string, PersistedToolCall>()
   let finalUsage: UsageMetadata | null = null
+  let finalFinishReason: "stop" | "length" | "error" | "abort" | null = null
 
   const ctx = auditFromContext(c)
 
@@ -247,7 +254,7 @@ chatRouter.post("/stream", async (c) => {
         userMessageId: userMsgId,
         model,
         ...(skillId ? { skillId: skillId as SkillId } : {}),
-        memoryEnabled,
+        memoryAllowed: conv.mode === "standard",
       },
       actor,
       abortController.signal,
@@ -261,7 +268,7 @@ chatRouter.post("/stream", async (c) => {
       request_id: ctx.request_id,
       resource: { type: "conversation", id: conversationId },
       outcome: "success",
-      details: { model, skillId: skillId ?? null, memoryEnabled },
+      details: { model, skillId: skillId ?? null, conversationMode: conv.mode },
     })
 
     // Create assistant message placeholder
@@ -274,6 +281,7 @@ chatRouter.post("/stream", async (c) => {
         skillUsed: result.metadata.skillUsed,
         skillsActivated: agentSkillToolSet.getActivatedSkills(),
         memoryEntriesUsed: result.metadata.memoryEntriesUsed,
+        memorySources: result.metadata.memorySources,
         model,
         streaming: true,
       },
@@ -282,6 +290,12 @@ chatRouter.post("/stream", async (c) => {
     // Stream SSE response
     return streamSSE(c, async (stream) => {
       try {
+        if (result.metadata.memorySources.length > 0) {
+          await stream.writeSSE({
+            event: "memory-context",
+            data: JSON.stringify({ sources: result.metadata.memorySources }),
+          })
+        }
         for await (const chunk of result.stream) {
           if (abortController.signal.aborted) {
             break
@@ -306,6 +320,7 @@ chatRouter.post("/stream", async (c) => {
             }
             case "finish": {
               finalUsage = chunk.usage
+              finalFinishReason = chunk.finishReason
               await stream.writeSSE({
                 event: "finish",
                 data: JSON.stringify({
@@ -494,8 +509,27 @@ chatRouter.post("/stream", async (c) => {
               skillUsed: result.metadata.skillUsed,
               skillsActivated: agentSkillToolSet.getActivatedSkills(),
               memoryEntriesUsed: result.metadata.memoryEntriesUsed,
+              memorySources: result.metadata.memorySources,
             },
           })
+
+          if (
+            finalUsage &&
+            accumulatedText &&
+            conv.mode === "standard" &&
+            (finalFinishReason === "stop" || finalFinishReason === "length")
+          ) {
+            await Promise.all([
+              enqueueMemoryJob("extract", actor.userId, {
+                userMessageId: userMsgId,
+                assistantMessageId: assistantMsgId,
+              }),
+              enqueueMemoryJob("index_history", actor.userId, {
+                userMessageId: userMsgId,
+                assistantMessageId: assistantMsgId,
+              }),
+            ]).catch(() => undefined)
+          }
         }
 
         // Record usage if we have it

@@ -9,7 +9,7 @@ A ChatGPT-like chat application monorepo powered by npm, Turbo, Next.js, Hono, a
 | Monorepo     | [npm](https://docs.npmjs.com) + [Turbo](https://turbo.build) |
 | Frontend     | [Next.js](https://nextjs.org) (App Router) |
 | Backend      | [Hono](https://hono.dev) on Node.js (tsx) |
-| Database     | [Postgres](https://postgresql.org) + [Drizzle](https://orm.drizzle.team) |
+| Database     | [Postgres](https://postgresql.org) + [pgvector](https://github.com/pgvector/pgvector) + [Drizzle](https://orm.drizzle.team) |
 | Auth         | [Better Auth](https://better-auth.com) |
 | LLM          | [Vercel AI SDK](https://ai-sdk.dev)    |
 | Linting      | [Biome](https://biomejs.dev)           |
@@ -64,6 +64,17 @@ npm run dev
 > **Docker is optional.** Only Postgres is recommended via Docker (`npm run dev:db`).
 > FE and BE run natively via Node.js/Next.js — no Docker Compose needed for them.
 
+The included Compose service uses the `pgvector/pgvector:pg16` image. If you provide Postgres
+yourself, install the `vector` and `unaccent` extensions before applying migration `0008`.
+
+### Memory V2
+
+Memory is opt-in per user and has separate controls for saved memories and chat-history retrieval.
+It supports explicit remember/forget tools, guarded background extraction, hybrid full-text/vector
+retrieval, source indicators, and Temporary Chat. Background extraction and embeddings use
+`MEMORY_API_KEY` (or `OPENAI_API_KEY` when omitted); chat remains available if the memory provider
+is not configured or temporarily fails.
+
 ### Local Dev Workflow
 
 | Step | Command                    | What it does                               |
@@ -107,7 +118,6 @@ The following features are intentionally deferred from the initial MVP to keep s
 
 | Feature | Rationale |
 | ------- | --------- |
-| **pgvector / Semantic Memory** | Vector similarity search for memory entries. Deferred because it requires the `pgvector` Postgres extension, additional indexing strategy, and a real LLM embedding pipeline. The current key-value memory model suffices for MVP. |
 | **Real OAuth Providers (Google, GitHub, etc.)** | Better Auth supports them out of the box, but wiring each provider requires OAuth app registration, callback URLs per environment, and UI for provider selection. Credential-only auth is simpler for MVP. |
 | **Distributed Redis-backed Rate Limiting & Sessions** | Current rate limiting is in-memory (per-process). Moving to Redis adds operational complexity and is only needed when horizontally scaling BE instances. |
 | **Advanced Tools (Web search, file upload, code execution)** | Tool-use infrastructure is designed in the contracts layer but not wired in the UI or BE. Post-MVP, each tool requires independent integration, sandboxing, and UX design. |
@@ -124,6 +134,11 @@ Key variables:
 - `DATABASE_URL` — Postgres connection string
 - `BETTER_AUTH_SECRET` — Auth encryption secret
 - `LLM_PROVIDER_API_KEY` — API key for LLM provider (optional)
+- `MEMORY_API_KEY` — optional dedicated OpenAI-compatible key for extraction/embeddings; falls back to `OPENAI_API_KEY`
+- `MEMORY_BASE_URL` — memory provider base URL (default: `https://api.openai.com/v1`)
+- `MEMORY_EXTRACTION_MODEL` — background extraction model (default: `gpt-5-nano`)
+- `MEMORY_EMBEDDING_MODEL` — embedding model (default: `text-embedding-3-small`)
+- `MEMORY_V2_ENABLED` — set to `false` to stop the background worker
 - `MCP_ALLOW_PRIVATE_NETWORKS` — allow MCP endpoints on localhost/private networks (default: false)
 - `MCP_ALLOW_LOCAL_COMMANDS` — allow authenticated users to run local stdio MCP servers as the backend OS account (default: false)
 - `APP_ENV` — Current environment (`development`, `staging`, `production`)

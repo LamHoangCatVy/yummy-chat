@@ -185,9 +185,13 @@ test.describe("Advanced smoke: skills + memory", () => {
     await page.getByRole("button", { name: "Add server" }).click()
 
     const type = page.getByLabel("Connection type")
-    await expect(type).toHaveValue("remote_custom")
-    await expect(type.locator('option[value="remote_oauth"]')).toHaveText("Remote with OAuth")
-    await expect(type.locator('option[value="local_stdio"]')).toBeDisabled()
+    await expect(type).toHaveText("Remote with custom arguments")
+    await type.click()
+    await expect(page.getByRole("option", { name: "Remote with OAuth" })).toBeVisible()
+    await expect(
+      page.getByRole("option", { name: "Local stdio with custom arguments" }),
+    ).toBeDisabled()
+    await page.keyboard.press("Escape")
 
     await page
       .getByRole("group", { name: "Headers" })
@@ -196,7 +200,8 @@ test.describe("Advanced smoke: skills + memory", () => {
     await expect(page.getByLabel("Headers name")).toBeVisible()
     await expect(page.getByLabel("Headers value")).toBeVisible()
 
-    await type.selectOption("remote_oauth")
+    await type.click()
+    await page.getByRole("option", { name: "Remote with OAuth" }).click()
     await expect(page.getByLabel("OAuth grant")).toBeVisible()
     await expect(page.getByLabel("Client registration")).toBeVisible()
 

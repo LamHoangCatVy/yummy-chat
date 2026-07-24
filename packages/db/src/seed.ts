@@ -185,13 +185,23 @@ async function seed(): Promise<void> {
 
   // ── Memory settings + entries ──────────────────────────────────────────
   await db.insert(userMemorySettings).values([
-    { userId: USER_1_ID, enabled: false },
-    { userId: USER_2_ID, enabled: true },
+    { userId: USER_1_ID, savedMemoryEnabled: false, chatHistoryEnabled: false },
+    { userId: USER_2_ID, savedMemoryEnabled: true, chatHistoryEnabled: true },
   ])
 
   await db.insert(memoryEntry).values([
-    { userId: USER_1_ID, key: "preferred_language", value: "en" },
-    { userId: USER_2_ID, key: "preferred_language", value: "vi" },
+    {
+      userId: USER_1_ID,
+      key: "preferred_language",
+      normalizedKey: "preferred_language",
+      value: "en",
+    },
+    {
+      userId: USER_2_ID,
+      key: "preferred_language",
+      normalizedKey: "preferred_language",
+      value: "vi",
+    },
   ])
 
   // ── Usage records ──────────────────────────────────────────────────────

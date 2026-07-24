@@ -70,7 +70,13 @@ conversationsRouter.post("/", async (c) => {
   const actor = actorFrom(c)
   const repo = conversationRepository(actor)
   const id = crypto.randomUUID() as ConversationId
-  const row = await repo.create({ id, title: parsed.data.title })
+  const row = await repo.create({
+    id,
+    title: parsed.data.title,
+    mode: parsed.data.mode,
+    expiresAt:
+      parsed.data.mode === "temporary" ? new Date(Date.now() + 24 * 60 * 60 * 1_000) : null,
+  })
 
   const res: ApiResponse<typeof row> = {
     success: true,

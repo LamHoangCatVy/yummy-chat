@@ -1,7 +1,7 @@
 "use client"
 
-import { Moon, Sun } from "lucide-react"
 import { useTheme } from "@/lib/use-theme"
+import { Moon, Sun } from "lucide-react"
 
 /**
  * Fixed top-right theme toggle, mounted globally in the root layout so it
@@ -22,8 +22,7 @@ import { useTheme } from "@/lib/use-theme"
 export function ThemeToggle() {
   const { resolvedTheme, toggleTheme } = useTheme()
 
-  const label =
-    resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+  const label = resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"
 
   return (
     <button

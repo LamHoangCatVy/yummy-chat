@@ -6,12 +6,13 @@ const testDatabase = await createTestDatabase(import.meta.url)
 process.env.BETTER_AUTH_SECRET = "test-secret-for-orchestrator-tests"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
 process.env.APP_ENV = "test"
+process.env.MEMORY_API_KEY = ""
+process.env.OPENAI_API_KEY = ""
 
 // Dynamic imports AFTER env vars are set so @yummy/db picks up test DB
 const { db } = await import("@yummy/db")
-const { conversation, memoryEntry, message, skill, userMemorySettings } = await import(
-  "@yummy/db/schema"
-)
+const { conversation, memoryEntry, memoryHistoryChunk, message, skill, userMemorySettings } =
+  await import("@yummy/db/schema")
 const { FakeLLMProvider } = await import("../llm/fake-provider")
 const { createOrchestrator } = await import("./orchestrator")
 type StreamChunk = import("../llm/provider").StreamChunk
@@ -113,7 +114,7 @@ describe("chat orchestrator", () => {
   })
 
   describe("prompt assembly — memory disabled", () => {
-    it("does not include memory when memoryEnabled is false", async () => {
+    it("does not include memory when memory is disallowed by the server", async () => {
       await db.insert(memoryEntry).values({
         id: crypto.randomUUID() as MemoryId,
         userId: testUserId,
@@ -136,12 +137,12 @@ describe("chat orchestrator", () => {
           conversationId: convId,
           userMessage: "What is my favorite color?",
           model: "fake",
-          memoryEnabled: false,
+          memoryAllowed: false,
         },
         actor,
       )
 
-      expect(result.systemPrompt).not.toContain("User Memory")
+      expect(result.systemPrompt).not.toContain("Saved User Memories")
       expect(result.systemPrompt).not.toContain("blue")
       expect(result.metadata.memoryEntriesUsed).toBe(0)
     })
@@ -152,9 +153,13 @@ describe("chat orchestrator", () => {
         .values({
           id: crypto.randomUUID() as MemoryId,
           userId: testUserId,
-          enabled: false,
+          savedMemoryEnabled: false,
+          chatHistoryEnabled: false,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: userMemorySettings.userId,
+          set: { savedMemoryEnabled: false, chatHistoryEnabled: false },
+        })
 
       const convId = crypto.randomUUID() as ConversationId
       await db.insert(conversation).values({
@@ -171,13 +176,13 @@ describe("chat orchestrator", () => {
           conversationId: convId,
           userMessage: "test",
           model: "fake",
-          memoryEnabled: true,
+          memoryAllowed: true,
         },
         actor,
       )
 
       expect(result.metadata.memoryEntriesUsed).toBe(0)
-      expect(result.systemPrompt).not.toContain("User Memory")
+      expect(result.systemPrompt).not.toContain("Saved User Memories")
     })
   })
 
@@ -188,11 +193,12 @@ describe("chat orchestrator", () => {
         .values({
           id: crypto.randomUUID() as MemoryId,
           userId: testUserId,
-          enabled: true,
+          savedMemoryEnabled: true,
+          chatHistoryEnabled: false,
         })
         .onConflictDoUpdate({
           target: userMemorySettings.userId,
-          set: { enabled: true },
+          set: { savedMemoryEnabled: true, chatHistoryEnabled: false },
         })
 
       await testSql`DELETE FROM memory_entry WHERE user_id = ${testUserId}`
@@ -218,14 +224,67 @@ describe("chat orchestrator", () => {
           conversationId: convId,
           userMessage: "Do you know me?",
           model: "fake",
-          memoryEnabled: true,
+          memoryAllowed: true,
         },
         actor,
       )
 
-      expect(result.systemPrompt).toContain("User Memory")
+      expect(result.systemPrompt).toContain("Saved User Memories")
       expect(result.systemPrompt).toContain("name: Test User")
       expect(result.metadata.memoryEntriesUsed).toBeGreaterThan(0)
+    })
+
+    it("includes only relevant cross-conversation history", async () => {
+      await testSql`
+        UPDATE user_memory_settings
+        SET saved_memory_enabled = true, chat_history_enabled = true
+        WHERE user_id = ${testUserId}
+      `
+
+      const pastConversationId = crypto.randomUUID() as ConversationId
+      const currentConversationId = crypto.randomUUID() as ConversationId
+      await db.insert(conversation).values([
+        { id: pastConversationId, userId: testUserId, title: "Tea preferences" },
+        { id: currentConversationId, userId: testUserId, title: "Current chat" },
+      ])
+      const userMessageId = crypto.randomUUID() as MessageId
+      const assistantMessageId = crypto.randomUUID() as MessageId
+      await db.insert(message).values([
+        {
+          id: userMessageId,
+          conversationId: pastConversationId,
+          role: "user",
+          content: "I prefer oolong tea.",
+        },
+        {
+          id: assistantMessageId,
+          conversationId: pastConversationId,
+          role: "assistant",
+          content: "I will keep that preference in mind.",
+        },
+      ])
+      await db.insert(memoryHistoryChunk).values({
+        userId: testUserId,
+        conversationId: pastConversationId,
+        userMessageId,
+        assistantMessageId,
+        content: "User: I prefer oolong tea.\nAssistant: I will keep that preference in mind.",
+      })
+
+      const provider = new FakeLLMProvider({ chunkDelayMs: 1 })
+      const result = await createOrchestrator({ provider }).orchestrate(
+        {
+          conversationId: currentConversationId,
+          userMessage: "Which tea do I prefer?",
+          model: "fake",
+          memoryAllowed: true,
+        },
+        actor,
+      )
+
+      expect(result.systemPrompt).toContain("Relevant Past Conversations")
+      expect(result.systemPrompt).toContain("oolong tea")
+      expect(result.metadata.memorySources.some((source) => source.kind === "past_chat")).toBe(true)
     })
   })
 
@@ -258,6 +317,7 @@ describe("chat orchestrator", () => {
           conversationId: convId,
           userMessage: "Latest message",
           model: "fake",
+          memoryAllowed: false,
         },
         actor,
       )
@@ -286,6 +346,7 @@ describe("chat orchestrator", () => {
           conversationId: convId,
           userMessage: "This must be included",
           model: "fake",
+          memoryAllowed: false,
         },
         actor,
       )

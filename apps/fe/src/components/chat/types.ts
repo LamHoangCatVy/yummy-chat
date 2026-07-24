@@ -12,6 +12,21 @@ export type LocalMessageId = string & { readonly __brand: unique symbol }
 /** Roles that appear in the chat transcript. */
 export type MessageRole = "user" | "assistant"
 
+export interface MemorySource {
+  readonly kind: "saved_memory" | "past_chat"
+  readonly id: string
+  readonly label: string
+  readonly conversationId?: string | null
+  readonly excerpt?: string
+}
+
+export interface MemoryProposalRequest {
+  readonly id: string
+  readonly key: string
+  readonly value: string
+  readonly category: string
+}
+
 /** A single message in the chat transcript. */
 export interface ChatMessage {
   readonly id: string
@@ -27,6 +42,10 @@ export interface ChatMessage {
   readonly reasoningContent?: string
   /** MCP tool calls emitted while the assistant response is streaming. */
   readonly toolCalls?: readonly ToolCallActivity[]
+  /** Saved memories or past chats that contributed context to this answer. */
+  readonly memorySources?: readonly MemorySource[]
+  /** Sensitive memory awaiting an explicit user confirmation. */
+  readonly memoryProposal?: MemoryProposalRequest
 }
 
 /** A file attachment from the assistant that the user can download. */

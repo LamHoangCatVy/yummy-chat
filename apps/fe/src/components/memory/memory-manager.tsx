@@ -1,6 +1,9 @@
 "use client"
 
+import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import {
+  clearMemoryEntries,
   deleteMemoryEntry,
   getMemorySettings,
   listMemoryEntries,
@@ -17,7 +20,8 @@ export function MemoryManager() {
   const [entries, setEntries] = useState<readonly MemoryEntry[]>([])
   const [status, setStatus] = useState<LoadStatus>("idle")
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [isEnabled, setIsEnabled] = useState(false)
+  const [savedMemoryEnabled, setSavedMemoryEnabled] = useState(false)
+  const [chatHistoryEnabled, setChatHistoryEnabled] = useState(false)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [isToggling, setIsToggling] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -30,7 +34,8 @@ export function MemoryManager() {
         getMemorySettings(),
         listMemoryEntries(),
       ])
-      setIsEnabled(settingsResult.enabled)
+      setSavedMemoryEnabled(settingsResult.savedMemoryEnabled)
+      setChatHistoryEnabled(settingsResult.chatHistoryEnabled)
       setSettingsLoaded(true)
       setEntries(entriesResult.entries)
       setStatus("idle")
@@ -45,19 +50,36 @@ export function MemoryManager() {
     void fetchData()
   }, [fetchData])
 
-  const handleToggle = useCallback(async () => {
-    if (isToggling) return
-    setIsToggling(true)
+  const updateSettings = useCallback(
+    async (saved: boolean, history: boolean) => {
+      if (isToggling) return
+      setIsToggling(true)
+      try {
+        const result = await updateMemorySettings({
+          savedMemoryEnabled: saved,
+          chatHistoryEnabled: saved && history,
+        })
+        setSavedMemoryEnabled(result.savedMemoryEnabled)
+        setChatHistoryEnabled(result.chatHistoryEnabled)
+      } catch (err: unknown) {
+        const message = err instanceof ApiError ? err.message : "Failed to update settings"
+        setErrorMsg(message)
+      } finally {
+        setIsToggling(false)
+      }
+    },
+    [isToggling],
+  )
+
+  const handleClear = useCallback(async () => {
     try {
-      const result = await updateMemorySettings({ enabled: !isEnabled })
-      setIsEnabled(result.enabled)
+      await clearMemoryEntries()
+      setEntries([])
     } catch (err: unknown) {
-      const message = err instanceof ApiError ? err.message : "Failed to update settings"
+      const message = err instanceof ApiError ? err.message : "Failed to clear memory"
       setErrorMsg(message)
-    } finally {
-      setIsToggling(false)
     }
-  }, [isEnabled, isToggling])
+  }, [])
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -87,6 +109,11 @@ export function MemoryManager() {
         <h2 className="text-[1.5rem] font-semibold leading-[1.3] tracking-[-0.015em] text-text-primary">
           Memory
         </h2>
+        {entries.length > 0 && (
+          <Button variant="outline" size="sm" onClick={() => void handleClear()}>
+            Clear all
+          </Button>
+        )}
       </div>
       <p className="mt-spacing-2 text-[0.8125rem] leading-[1.5] text-text-secondary">
         Memory stores key information across conversations. When enabled, the AI uses these memories
@@ -95,32 +122,37 @@ export function MemoryManager() {
 
       {settingsLoaded && (
         <div className="mt-spacing-6 rounded-radius-md border border-border-subtle bg-surface-secondary px-spacing-4 py-spacing-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-spacing-4">
             <div>
-              <p className="text-[0.9375rem] font-medium leading-[1.4] text-text-primary">Memory</p>
+              <p className="text-[0.9375rem] font-medium leading-[1.4] text-text-primary">
+                Saved memories
+              </p>
               <p className="mt-spacing-1 text-[0.8125rem] leading-[1.5] text-text-secondary">
-                {isEnabled
-                  ? "Memory is active. The AI retains information across conversations."
-                  : "Memory is disabled. The AI won't remember context between sessions."}
+                Keep stable preferences and facts across conversations.
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isEnabled}
-              aria-label={isEnabled ? "Disable memory" : "Enable memory"}
-              onClick={() => void handleToggle()}
+            <Switch
+              checked={savedMemoryEnabled}
+              aria-label="Saved memories"
+              onCheckedChange={(checked) => void updateSettings(checked, chatHistoryEnabled)}
               disabled={isToggling}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-radius-full transition-colors duration-[200ms] ${
-                isEnabled ? "bg-accent-primary" : "bg-border-default"
-              } ${isToggling ? "opacity-60" : ""}`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 translate-y-0.5 rounded-radius-full bg-surface-primary shadow-sm transition-transform duration-[200ms] ${
-                  isEnabled ? "translate-x-[22px]" : "translate-x-0.5"
-                }`}
-              />
-            </button>
+            />
+          </div>
+          <div className="mt-spacing-4 flex items-center justify-between gap-spacing-4 border-t border-border-subtle pt-spacing-4">
+            <div>
+              <p className="text-[0.9375rem] font-medium leading-[1.4] text-text-primary">
+                Reference chat history
+              </p>
+              <p className="mt-spacing-1 text-[0.8125rem] leading-[1.5] text-text-secondary">
+                Find relevant context from earlier Yummy Chat conversations.
+              </p>
+            </div>
+            <Switch
+              checked={chatHistoryEnabled}
+              aria-label="Reference chat history"
+              onCheckedChange={(checked) => void updateSettings(savedMemoryEnabled, checked)}
+              disabled={isToggling || !savedMemoryEnabled}
+            />
           </div>
         </div>
       )}
@@ -172,7 +204,7 @@ export function MemoryManager() {
           </div>
         )}
 
-        {!isEnabled && settingsLoaded && (
+        {!savedMemoryEnabled && settingsLoaded && (
           <div className="flex flex-col items-center justify-center py-spacing-12 text-center">
             <Brain size={32} className="text-text-tertiary" />
             <p className="mt-spacing-3 text-[0.8125rem] leading-[1.5] text-text-secondary">
@@ -181,7 +213,7 @@ export function MemoryManager() {
           </div>
         )}
 
-        {isEnabled && status !== "loading" && entries.length === 0 && (
+        {savedMemoryEnabled && status !== "loading" && entries.length === 0 && (
           <div className="flex flex-col items-center justify-center py-spacing-12 text-center">
             <Brain size={32} className="text-text-tertiary" />
             <p className="mt-spacing-3 text-[0.8125rem] leading-[1.5] text-text-secondary">

@@ -1,5 +1,17 @@
 "use client"
 
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import {
   ApiError,
@@ -446,125 +458,117 @@ function McpForm({
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
   return (
-    <form
-      onSubmit={onSubmit}
-      className="mt-spacing-5 rounded-radius-md border border-border-default bg-surface-secondary p-spacing-4"
-    >
-      <div className="flex items-center justify-between">
+    <Card className="mt-spacing-5 p-spacing-4">
+      <CardHeader>
         <h3 className="text-[0.9375rem] font-semibold text-text-primary">
           {editing ? "Edit MCP server" : "Add MCP server"}
         </h3>
-        <button
-          type="button"
+        <Button
           onClick={onClose}
           aria-label="Close form"
-          className="text-text-tertiary hover:text-text-primary"
+          variant="ghost"
+          size="icon"
+          className="text-text-tertiary"
         >
           <X size={16} />
-        </button>
-      </div>
-      <div className="mt-spacing-4 grid gap-spacing-4">
-        <Field label="Name" id="mcp-name">
-          <input
-            id="mcp-name"
-            required
-            maxLength={100}
-            value={form.name}
-            onChange={(event) => update("name", event.target.value)}
-            placeholder="Company tools"
-            className="input"
-          />
-        </Field>
-        <Field label="Connection type" id="mcp-type">
-          <select
-            id="mcp-type"
-            value={form.type}
-            onChange={(event) => update("type", event.target.value as ConnectionType)}
-            className="input"
-          >
-            <option value="remote_oauth">Remote with OAuth</option>
-            <option value="remote_custom">Remote with custom arguments</option>
-            <option value="local_stdio" disabled={!localStdioEnabled}>
-              Local stdio with custom arguments
-            </option>
-          </select>
-          {!localStdioEnabled && (
-            <p className="mt-spacing-1 text-[0.75rem] text-text-tertiary">
-              Set MCP_ALLOW_LOCAL_COMMANDS=true to enable local commands.
-            </p>
-          )}
-        </Field>
+        </Button>
+      </CardHeader>
+      <CardContent className="mt-spacing-4">
+        <form id="mcp-server-form" onSubmit={onSubmit} className="grid gap-spacing-4">
+          <Field label="Name" id="mcp-name">
+            <Input
+              id="mcp-name"
+              required
+              maxLength={100}
+              value={form.name}
+              onChange={(event) => update("name", event.target.value)}
+              placeholder="Company tools"
+            />
+          </Field>
+          <Field label="Connection type" id="mcp-type">
+            <Select
+              value={form.type}
+              onValueChange={(value) => update("type", value as ConnectionType)}
+            >
+              <SelectTrigger id="mcp-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="remote_oauth">Remote with OAuth</SelectItem>
+                <SelectItem value="remote_custom">Remote with custom arguments</SelectItem>
+                <SelectItem value="local_stdio" disabled={!localStdioEnabled}>
+                  Local stdio with custom arguments
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {!localStdioEnabled && (
+              <p className="mt-spacing-1 text-[0.75rem] text-text-tertiary">
+                Set MCP_ALLOW_LOCAL_COMMANDS=true to enable local commands.
+              </p>
+            )}
+          </Field>
 
-        {form.type === "remote_oauth" && <OAuthFields form={form} update={update} />}
-        {form.type === "remote_custom" && (
-          <>
-            <UrlField value={form.url} onChange={(value) => update("url", value)} />
-            <NamedRows
-              label="Headers"
-              entries={form.headers}
-              onChange={(entries) => update("headers", entries)}
-              namePlaceholder="Authorization"
-            />
-            <NamedRows
-              label="Query parameters"
-              entries={form.query}
-              onChange={(entries) => update("query", entries)}
-              namePlaceholder="tenant"
-            />
-          </>
-        )}
-        {form.type === "local_stdio" && (
-          <>
-            <Field label="Command" id="mcp-command">
-              <input
-                id="mcp-command"
-                required
-                value={form.command}
-                onChange={(event) => update("command", event.target.value)}
-                placeholder="npx"
-                className="input"
+          {form.type === "remote_oauth" && <OAuthFields form={form} update={update} />}
+          {form.type === "remote_custom" && (
+            <>
+              <UrlField value={form.url} onChange={(value) => update("url", value)} />
+              <NamedRows
+                label="Headers"
+                entries={form.headers}
+                onChange={(entries) => update("headers", entries)}
+                namePlaceholder="Authorization"
               />
-            </Field>
-            <ArgumentRows entries={form.args} onChange={(entries) => update("args", entries)} />
-            <NamedRows
-              label="Environment variables"
-              entries={form.env}
-              onChange={(entries) => update("env", entries)}
-              namePlaceholder="API_KEY"
-            />
-            <Field label="Working directory (optional)" id="mcp-cwd">
-              <input
-                id="mcp-cwd"
-                value={form.cwd}
-                onChange={(event) => update("cwd", event.target.value)}
-                placeholder="/workspace/project"
-                className="input"
+              <NamedRows
+                label="Query parameters"
+                entries={form.query}
+                onChange={(entries) => update("query", entries)}
+                namePlaceholder="tenant"
               />
-            </Field>
-            <p className="rounded-radius-sm bg-status-error/5 px-spacing-3 py-spacing-2 text-[0.75rem] text-status-error">
-              This command runs with the backend service account's file and network permissions.
-            </p>
-          </>
-        )}
-      </div>
-      <div className="mt-spacing-4 flex justify-end gap-spacing-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-radius-md px-spacing-3 py-spacing-2 text-[0.8125rem] text-text-secondary hover:bg-surface-tertiary"
-        >
+            </>
+          )}
+          {form.type === "local_stdio" && (
+            <>
+              <Field label="Command" id="mcp-command">
+                <Input
+                  id="mcp-command"
+                  required
+                  value={form.command}
+                  onChange={(event) => update("command", event.target.value)}
+                  placeholder="npx"
+                />
+              </Field>
+              <ArgumentRows entries={form.args} onChange={(entries) => update("args", entries)} />
+              <NamedRows
+                label="Environment variables"
+                entries={form.env}
+                onChange={(entries) => update("env", entries)}
+                namePlaceholder="API_KEY"
+              />
+              <Field label="Working directory (optional)" id="mcp-cwd">
+                <Input
+                  id="mcp-cwd"
+                  value={form.cwd}
+                  onChange={(event) => update("cwd", event.target.value)}
+                  placeholder="/workspace/project"
+                />
+              </Field>
+              <p className="rounded-radius-sm bg-status-error/5 px-spacing-3 py-spacing-2 text-[0.75rem] text-status-error">
+                This command runs with the backend service account's file and network permissions.
+              </p>
+            </>
+          )}
+        </form>
+      </CardContent>
+      <CardFooter className="mt-spacing-4 justify-end gap-spacing-2">
+        <Button onClick={onClose} variant="ghost">
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex items-center gap-spacing-2 rounded-radius-md bg-accent-primary px-spacing-3 py-spacing-2 text-[0.8125rem] font-medium text-text-inverse hover:opacity-90 disabled:opacity-40"
-        >
+        </Button>
+        <Button type="submit" form="mcp-server-form" disabled={saving}>
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? "Saving..." : editing ? "Save changes" : "Add server"}
-        </button>
-      </div>
-    </form>
+        </Button>
+      </CardFooter>
+    </Card>
   )
 }
 
@@ -580,62 +584,65 @@ function OAuthFields({
     <>
       <UrlField value={form.url} onChange={(value) => update("url", value)} />
       <Field label="OAuth grant" id="mcp-grant">
-        <select
-          id="mcp-grant"
+        <Select
           value={form.grantType}
-          onChange={(event) => update("grantType", event.target.value as FormState["grantType"])}
-          className="input"
+          onValueChange={(value) => update("grantType", value as FormState["grantType"])}
         >
-          <option value="authorization_code">Authorization code + PKCE</option>
-          <option value="client_credentials">Client credentials</option>
-        </select>
+          <SelectTrigger id="mcp-grant">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="authorization_code">Authorization code + PKCE</SelectItem>
+            <SelectItem value="client_credentials">Client credentials</SelectItem>
+          </SelectContent>
+        </Select>
       </Field>
       {form.grantType === "authorization_code" && (
         <Field label="Client registration" id="mcp-registration">
-          <select
-            id="mcp-registration"
+          <Select
             value={form.registrationMode}
-            onChange={(event) =>
-              update("registrationMode", event.target.value as FormState["registrationMode"])
+            onValueChange={(value) =>
+              update("registrationMode", value as FormState["registrationMode"])
             }
-            className="input"
           >
-            <option value="dynamic">Automatic discovery and registration</option>
-            <option value="manual">Use a pre-registered client</option>
-          </select>
+            <SelectTrigger id="mcp-registration">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dynamic">Automatic discovery and registration</SelectItem>
+              <SelectItem value="manual">Use a pre-registered client</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       )}
       {manual && (
         <Field label="Client ID" id="mcp-client-id">
-          <input
+          <Input
             id="mcp-client-id"
             required
             value={form.clientId}
             onChange={(event) => update("clientId", event.target.value)}
-            className="input"
           />
         </Field>
       )}
       {manual && (
         <Field label="Client secret" id="mcp-client-secret">
-          <input
+          <Input
             id="mcp-client-secret"
             type="password"
             autoComplete="off"
             value={form.clientSecret}
             onChange={(event) => update("clientSecret", event.target.value)}
             placeholder="Leave blank to keep the saved secret"
-            className="input"
           />
         </Field>
       )}
       <Field label="Scopes (space or comma separated)" id="mcp-scopes">
-        <input
+        <Input
           id="mcp-scopes"
           value={form.scopes}
           onChange={(event) => update("scopes", event.target.value)}
           placeholder="openid profile tools.read"
-          className="input"
         />
       </Field>
     </>
@@ -648,14 +655,13 @@ function UrlField({
 }: { readonly value: string; readonly onChange: (value: string) => void }) {
   return (
     <Field label="Server URL" id="mcp-url">
-      <input
+      <Input
         id="mcp-url"
         required
         type="url"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="https://mcp.example.com/mcp"
-        className="input"
       />
     </Field>
   )
@@ -677,55 +683,52 @@ function NamedRows({
       entries.map((entry, entryIndex) => (entryIndex === index ? { ...entry, ...patch } : entry)),
     )
   return (
-    <fieldset>
-      <div className="flex items-center justify-between">
-        <legend className="text-[0.8125rem] font-medium text-text-primary">{label}</legend>
-        <button
-          type="button"
-          onClick={() => onChange([...entries, { name: "", value: "", secret: false }])}
-          className="text-[0.75rem] text-accent-primary"
-        >
-          + Add
-        </button>
-      </div>
+    <fieldset className="relative">
+      <legend className="text-[0.8125rem] font-medium text-text-primary">{label}</legend>
+      <Button
+        onClick={() => onChange([...entries, { name: "", value: "", secret: false }])}
+        variant="ghost"
+        size="sm"
+        className="absolute top-0 right-0 h-auto px-0 py-0 text-[0.75rem] text-accent-primary hover:bg-transparent"
+      >
+        + Add
+      </Button>
       <div className="mt-spacing-2 space-y-spacing-2">
         {entries.map((entry, index) => (
           <div
             key={entry.id ?? `new-${index}`}
             className="grid grid-cols-[1fr_1fr_auto_auto] gap-spacing-2"
           >
-            <input
+            <Input
               aria-label={`${label} name`}
               required
               value={entry.name}
               onChange={(event) => update(index, { name: event.target.value })}
               placeholder={namePlaceholder}
-              className="input"
             />
-            <input
+            <Input
               aria-label={`${label} value`}
               type={entry.secret ? "password" : "text"}
               value={entry.value}
               onChange={(event) => update(index, { value: event.target.value })}
               placeholder={entry.hasValue ? "Saved — leave blank to keep" : "Value"}
-              className="input"
             />
-            <label className="flex items-center gap-spacing-1 text-[0.75rem] text-text-secondary">
-              <input
-                type="checkbox"
+            <Label className="gap-spacing-1 text-[0.75rem] font-normal text-text-secondary">
+              <Checkbox
                 checked={entry.secret}
-                onChange={(event) => update(index, { secret: event.target.checked })}
-              />{" "}
+                onCheckedChange={(checked) => update(index, { secret: checked === true })}
+              />
               Secret
-            </label>
-            <button
-              type="button"
+            </Label>
+            <Button
               aria-label={`Remove ${label} row`}
               onClick={() => onChange(entries.filter((_, entryIndex) => entryIndex !== index))}
+              variant="ghost"
+              size="icon"
               className="text-text-tertiary hover:text-status-error"
             >
               <X size={15} />
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -742,49 +745,47 @@ function ArgumentRows({
       entries.map((entry, entryIndex) => (entryIndex === index ? { ...entry, ...patch } : entry)),
     )
   return (
-    <fieldset>
-      <div className="flex items-center justify-between">
-        <legend className="text-[0.8125rem] font-medium text-text-primary">
-          Arguments (in order)
-        </legend>
-        <button
-          type="button"
-          onClick={() => onChange([...entries, { value: "", secret: false }])}
-          className="text-[0.75rem] text-accent-primary"
-        >
-          + Add
-        </button>
-      </div>
+    <fieldset className="relative">
+      <legend className="text-[0.8125rem] font-medium text-text-primary">
+        Arguments (in order)
+      </legend>
+      <Button
+        onClick={() => onChange([...entries, { value: "", secret: false }])}
+        variant="ghost"
+        size="sm"
+        className="absolute top-0 right-0 h-auto px-0 py-0 text-[0.75rem] text-accent-primary hover:bg-transparent"
+      >
+        + Add
+      </Button>
       <div className="mt-spacing-2 space-y-spacing-2">
         {entries.map((entry, index) => (
           <div
             key={entry.id ?? `new-${index}`}
             className="grid grid-cols-[1fr_auto_auto] gap-spacing-2"
           >
-            <input
+            <Input
               aria-label={`Argument ${index + 1}`}
               value={entry.value}
               onChange={(event) => update(index, { value: event.target.value })}
               type={entry.secret ? "password" : "text"}
               placeholder={entry.hasValue ? "Saved — leave blank to keep" : "Argument"}
-              className="input"
             />
-            <label className="flex items-center gap-spacing-1 text-[0.75rem] text-text-secondary">
-              <input
-                type="checkbox"
+            <Label className="gap-spacing-1 text-[0.75rem] font-normal text-text-secondary">
+              <Checkbox
                 checked={entry.secret}
-                onChange={(event) => update(index, { secret: event.target.checked })}
-              />{" "}
+                onCheckedChange={(checked) => update(index, { secret: checked === true })}
+              />
               Secret
-            </label>
-            <button
-              type="button"
+            </Label>
+            <Button
               aria-label={`Remove argument ${index + 1}`}
               onClick={() => onChange(entries.filter((_, entryIndex) => entryIndex !== index))}
+              variant="ghost"
+              size="icon"
               className="text-text-tertiary hover:text-status-error"
             >
               <X size={15} />
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -966,12 +967,12 @@ function Field({
 }: { readonly label: string; readonly id: string; readonly children: React.ReactNode }) {
   return (
     <div>
-      <label
+      <Label
         htmlFor={id}
         className="mb-spacing-1 block text-[0.8125rem] font-medium text-text-primary"
       >
         {label}
-      </label>
+      </Label>
       {children}
     </div>
   )

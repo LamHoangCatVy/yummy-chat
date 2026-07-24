@@ -1,5 +1,6 @@
 "use client"
 
+import { Switch } from "@/components/ui/switch"
 import { getMemorySettings, listMemoryEntries, updateMemorySettings } from "@/lib/api"
 import { ApiError } from "@/lib/api"
 import type { MemoryEntry } from "@yummy/shared"
@@ -16,7 +17,8 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
   const [entries, setEntries] = useState<readonly MemoryEntry[]>([])
   const [status, setStatus] = useState<LoadStatus>("idle")
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [isEnabled, setIsEnabled] = useState(false)
+  const [savedMemoryEnabled, setSavedMemoryEnabled] = useState(false)
+  const [chatHistoryEnabled, setChatHistoryEnabled] = useState(false)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [isToggling, setIsToggling] = useState(false)
 
@@ -28,7 +30,8 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
         getMemorySettings(),
         listMemoryEntries(),
       ])
-      setIsEnabled(settingsResult.enabled)
+      setSavedMemoryEnabled(settingsResult.savedMemoryEnabled)
+      setChatHistoryEnabled(settingsResult.chatHistoryEnabled)
       setSettingsLoaded(true)
       setEntries(entriesResult.entries)
       setStatus("idle")
@@ -43,19 +46,26 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
     void fetchData()
   }, [fetchData])
 
-  const handleToggle = useCallback(async () => {
-    if (isToggling) return
-    setIsToggling(true)
-    try {
-      const result = await updateMemorySettings({ enabled: !isEnabled })
-      setIsEnabled(result.enabled)
-    } catch (err: unknown) {
-      const message = err instanceof ApiError ? err.message : "Failed to update settings"
-      setErrorMsg(message)
-    } finally {
-      setIsToggling(false)
-    }
-  }, [isEnabled, isToggling])
+  const updateSettings = useCallback(
+    async (saved: boolean, history: boolean) => {
+      if (isToggling) return
+      setIsToggling(true)
+      try {
+        const result = await updateMemorySettings({
+          savedMemoryEnabled: saved,
+          chatHistoryEnabled: saved && history,
+        })
+        setSavedMemoryEnabled(result.savedMemoryEnabled)
+        setChatHistoryEnabled(result.chatHistoryEnabled)
+      } catch (err: unknown) {
+        const message = err instanceof ApiError ? err.message : "Failed to update settings"
+        setErrorMsg(message)
+      } finally {
+        setIsToggling(false)
+      }
+    },
+    [isToggling],
+  )
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -89,33 +99,37 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
 
       {settingsLoaded && (
         <div className="border-b border-border-subtle px-spacing-4 py-spacing-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-spacing-3">
             <div>
               <p className="text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
-                Enable memory
+                Saved memories
               </p>
               <p className="text-[0.75rem] leading-[1.4] text-text-tertiary">
-                {isEnabled
-                  ? "The AI will remember context across conversations."
-                  : "Memory is disabled. The AI won't retain information between sessions."}
+                Keep preferences and facts across conversations.
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isEnabled}
-              onClick={() => void handleToggle()}
+            <Switch
+              checked={savedMemoryEnabled}
+              aria-label="Saved memories"
+              onCheckedChange={(checked) => void updateSettings(checked, chatHistoryEnabled)}
               disabled={isToggling}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-radius-full transition-colors duration-[200ms] ${
-                isEnabled ? "bg-accent-primary" : "bg-border-default"
-              } ${isToggling ? "opacity-60" : ""}`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 translate-y-0.5 rounded-radius-full bg-surface-primary shadow-sm transition-transform duration-[200ms] ${
-                  isEnabled ? "translate-x-[22px]" : "translate-x-0.5"
-                }`}
-              />
-            </button>
+            />
+          </div>
+          <div className="mt-spacing-3 flex items-center justify-between gap-spacing-3 border-t border-border-subtle pt-spacing-3">
+            <div>
+              <p className="text-[0.8125rem] font-medium leading-[1.5] text-text-primary">
+                Reference chat history
+              </p>
+              <p className="text-[0.75rem] leading-[1.4] text-text-tertiary">
+                Retrieve relevant context from earlier chats.
+              </p>
+            </div>
+            <Switch
+              checked={chatHistoryEnabled}
+              aria-label="Reference chat history"
+              onCheckedChange={(checked) => void updateSettings(savedMemoryEnabled, checked)}
+              disabled={isToggling || !savedMemoryEnabled}
+            />
           </div>
         </div>
       )}
@@ -156,7 +170,7 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
           </div>
         )}
 
-        {!isEnabled && settingsLoaded && (
+        {!savedMemoryEnabled && settingsLoaded && (
           <div className="flex flex-col items-center justify-center py-spacing-8 text-center">
             <Brain size={32} className="text-text-tertiary" />
             <p className="mt-spacing-3 text-[0.8125rem] leading-[1.5] text-text-secondary">
@@ -166,7 +180,7 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
           </div>
         )}
 
-        {isEnabled && status !== "loading" && entries.length === 0 && (
+        {savedMemoryEnabled && status !== "loading" && entries.length === 0 && (
           <div className="flex flex-col items-center justify-center py-spacing-8 text-center">
             <Brain size={32} className="text-text-tertiary" />
             <p className="mt-spacing-3 text-[0.8125rem] leading-[1.5] text-text-secondary">
@@ -175,7 +189,7 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
           </div>
         )}
 
-        {isEnabled &&
+        {savedMemoryEnabled &&
           entries.map((entry) => (
             <MemoryEntryCard
               key={entry.id}

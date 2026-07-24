@@ -1,5 +1,5 @@
 import type { MessageListItem } from "@/lib/api"
-import type { ChatMessage, FileAttachment, ToolCallActivity } from "./types"
+import type { ChatMessage, FileAttachment, MemorySource, ToolCallActivity } from "./types"
 
 export function stripGeneratedJsonBlocks(text: string): string {
   return text
@@ -12,6 +12,7 @@ export function mapMessageListItemToChatMessage(m: MessageListItem): ChatMessage
   const reasoningContent =
     typeof m.metadata?.reasoningContent === "string" ? m.metadata.reasoningContent : undefined
   const toolCalls = parseToolCalls(m.metadata?.toolCalls)
+  const memorySources = parseMemorySources(m.metadata?.memorySources)
 
   const base: ChatMessage = {
     id: m.id,
@@ -21,6 +22,7 @@ export function mapMessageListItemToChatMessage(m: MessageListItem): ChatMessage
     createdAt: m.createdAt,
     ...(reasoningContent !== undefined ? { reasoningContent } : {}),
     ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(memorySources.length > 0 ? { memorySources } : {}),
   }
 
   const filesFromMetadata = m.metadata?.files
@@ -44,6 +46,37 @@ export function mapMessageListItemToChatMessage(m: MessageListItem): ChatMessage
   }
 
   return { ...base, files: validFiles }
+}
+
+function parseMemorySources(value: unknown): readonly MemorySource[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((source) => {
+    if (
+      !isRecord(source) ||
+      (source.kind !== "saved_memory" && source.kind !== "past_chat") ||
+      typeof source.id !== "string" ||
+      typeof source.label !== "string" ||
+      (source.conversationId !== undefined &&
+        source.conversationId !== null &&
+        typeof source.conversationId !== "string") ||
+      (source.excerpt !== undefined && typeof source.excerpt !== "string")
+    ) {
+      return []
+    }
+
+    return [
+      {
+        kind: source.kind,
+        id: source.id,
+        label: source.label,
+        ...(source.conversationId !== undefined
+          ? { conversationId: source.conversationId as string | null }
+          : {}),
+        ...(source.excerpt !== undefined ? { excerpt: source.excerpt as string } : {}),
+      },
+    ]
+  })
 }
 
 function isFileAttachment(value: unknown): value is FileAttachment {

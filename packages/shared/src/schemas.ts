@@ -26,6 +26,8 @@ export const conversationSchema = z.object({
   id: conversationIdSchema,
   userId: userIdSchema,
   title: z.string().min(1).max(200),
+  mode: z.enum(["standard", "temporary"]).default("standard"),
+  expiresAt: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })
@@ -80,12 +82,44 @@ export const memoryEntrySchema = z.object({
   id: memoryIdSchema,
   userId: userIdSchema,
   key: z.string().min(1).max(200),
+  normalizedKey: z.string().optional(),
   value: z.string(),
   category: z.string().max(50).nullable().optional(),
   source: z.string().max(50).nullable().optional(),
+  origin: z.enum(["manual", "explicit", "automatic"]).optional(),
+  status: z.enum(["active", "archived"]).optional(),
   confidence: z.number().min(0).max(1).nullable().optional(),
+  importance: z.number().min(0).max(1).optional(),
+  sourceConversationId: conversationIdSchema.nullable().optional(),
+  sourceMessageId: messageIdSchema.nullable().optional(),
+  lastUsedAt: z.string().datetime().nullable().optional(),
+  useCount: z.number().int().min(0).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+})
+
+export const memorySourceSchema = z.object({
+  kind: z.enum(["saved_memory", "past_chat"]),
+  id: z.string().min(1),
+  label: z.string().min(1).max(200),
+  conversationId: conversationIdSchema.nullable().optional(),
+  excerpt: z.string().max(500).optional(),
+})
+
+export const memoryEventSchema = z.object({
+  id: z.string().uuid(),
+  memoryId: memoryIdSchema.nullable().optional(),
+  type: z.enum(["created", "updated", "deleted"]),
+  key: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+})
+
+export const memoryProposalSchema = z.object({
+  id: z.string().uuid(),
+  key: z.string().min(1).max(200),
+  value: z.string().min(1).max(100_000),
+  category: z.string().max(50).nullable().optional(),
+  expiresAt: z.string().datetime(),
 })
 
 export const sendMessageInputSchema = z.object({
@@ -103,6 +137,7 @@ export const sendMessageResponseSchema = z.object({
 
 export const createConversationInputSchema = z.object({
   title: z.string().min(1).max(200),
+  mode: z.enum(["standard", "temporary"]).optional().default("standard"),
 })
 
 export const updateConversationInputSchema = z.object({
@@ -147,11 +182,17 @@ export const updateMemoryInputSchema = z.object({
 })
 
 export const memorySettingsSchema = z.object({
-  enabled: z.boolean(),
+  savedMemoryEnabled: z.boolean(),
+  chatHistoryEnabled: z.boolean(),
 })
 
 export const memoryListResponseSchema = z.object({
   entries: z.array(memoryEntrySchema),
+  nextCursor: z.string().nullable().optional(),
+})
+
+export const memoryEventListResponseSchema = z.object({
+  events: z.array(memoryEventSchema),
 })
 
 export const modelItemSchema = z.object({
@@ -349,15 +390,19 @@ export type CreateMemoryInput = z.infer<typeof createMemoryInputSchema>
 export type UpdateMemoryInput = z.infer<typeof updateMemoryInputSchema>
 export type MemorySettings = z.infer<typeof memorySettingsSchema>
 export type MemoryEntry = z.infer<typeof memoryEntrySchema>
+export type MemorySource = z.infer<typeof memorySourceSchema>
+export type MemoryEvent = z.infer<typeof memoryEventSchema>
+export type MemoryProposal = z.infer<typeof memoryProposalSchema>
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>
 export type SendMessageResponse = z.infer<typeof sendMessageResponseSchema>
-export type CreateConversationInput = z.infer<typeof createConversationInputSchema>
+export type CreateConversationInput = z.input<typeof createConversationInputSchema>
 export type UpdateConversationInput = z.infer<typeof updateConversationInputSchema>
 export type AppendMessageInput = z.infer<typeof appendMessageInputSchema>
 export type PaginationInput = z.infer<typeof paginationInputSchema>
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>
 export type SkillListResponse = z.infer<typeof skillListResponseSchema>
 export type MemoryListResponse = z.infer<typeof memoryListResponseSchema>
+export type MemoryEventListResponse = z.infer<typeof memoryEventListResponseSchema>
 export type ModelItem = z.infer<typeof modelItemSchema>
 export type ModelListResponse = z.infer<typeof modelListResponseSchema>
 export type AdvancedSettingsGetResponse = z.infer<typeof advancedSettingsGetResponseSchema>

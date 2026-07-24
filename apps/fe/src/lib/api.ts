@@ -17,6 +17,7 @@ import type {
   McpServerUpdateInput,
   McpToolListResponse,
   MemoryEntry,
+  MemoryEventListResponse,
   MemoryListResponse,
   MemorySettings,
   ModelListResponse,
@@ -38,6 +39,7 @@ import {
   mcpServerSchema,
   mcpToolListResponseSchema,
   memoryEntrySchema,
+  memoryEventListResponseSchema,
   memoryListResponseSchema,
   memorySettingsSchema,
   modelListResponseSchema,
@@ -252,6 +254,28 @@ export function updateMemorySettings(input: MemorySettings) {
   })
 }
 
+export function clearMemoryEntries() {
+  return fetchApi(API_V1.MEMORY, { method: "DELETE" })
+}
+
+export function listMemoryEvents(after: string) {
+  const params = new URLSearchParams({ after })
+  return fetchApi(`${API_V1.MEMORY}/events?${params.toString()}`, {
+    schema: memoryEventListResponseSchema,
+  })
+}
+
+export function confirmMemoryProposal(id: string) {
+  return fetchApi(`${API_V1.MEMORY}/proposals/${id}/confirm`, {
+    method: "POST",
+    schema: memoryEntrySchema,
+  })
+}
+
+export function cancelMemoryProposal(id: string) {
+  return fetchApi(`${API_V1.MEMORY}/proposals/${id}`, { method: "DELETE" })
+}
+
 export function getAdvancedSettings(): Promise<AdvancedSettingsGetResponse> {
   return fetchApi(`${API_V1.SETTINGS}/advanced`, { schema: advancedSettingsGetResponseSchema })
 }
@@ -386,6 +410,7 @@ export type {
   CreateSkillInput,
   UpdateSkillInput,
   MemoryEntry,
+  MemoryEventListResponse,
   MemoryListResponse,
   CreateMemoryInput,
   UpdateMemoryInput,
